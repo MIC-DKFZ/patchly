@@ -1,5 +1,5 @@
 import numpy as np
-from slicer import slicer
+from samplify.slicer import slicer
 from torch.utils.data import Dataset
 from skimage import transform as ski_transform
 import copy

@@ -2,3 +2,7 @@
 .idea/
 
 samplify.egg-info/
+
+samplify/__pycache__/
+
+tests/__pycache__/

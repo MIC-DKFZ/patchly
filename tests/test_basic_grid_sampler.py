@@ -7,44 +7,44 @@ from samplify.slicer import slicer
 
 class TestBasicGridSampler(unittest.TestCase):
     def test_without_overlap_without_remainder_2d(self):
-        self._test_without_overlap_without_remainder(spatial_dims=2, patch_size_range=(50, 500), image_size_multiple=(1, 50))
+        self._test_without_overlap_without_remainder(spatial_dims=2, patch_size_range=(25000, 250000), image_size_multiple=(1, 25000))
 
     def test_without_overlap_with_remainder_2d(self):
-        self._test_without_overlap_with_remainder(spatial_dims=2, patch_size_range=(50, 500), image_size_max=5000)
+        self._test_without_overlap_with_remainder(spatial_dims=2, patch_size_range=(25000, 250000), image_size_max=2500000)
 
     def test_with_overlap_without_remainder_2d(self):
-        self._test_with_overlap_without_remainder(spatial_dims=2, patch_overlap_size_range=(50, 500), patch_size_range=(1, 10), image_size_multiple=(1, 50))
+        self._test_with_overlap_without_remainder(spatial_dims=2, patch_overlap_size_range=(25000, 250000), patch_size_range=(1, 100), image_size_multiple=(1, 25000))
 
     def test_with_overlap_with_remainder_2d(self):
-        self._test_with_overlap_with_remainder(spatial_dims=2, patch_overlap_size_range=(50, 500), patch_size_range=(1, 10), image_size_max=5000)
+        self._test_with_overlap_with_remainder(spatial_dims=2, patch_overlap_size_range=(25000, 250000), patch_size_range=(1, 100), image_size_max=2500000)
 
     def test_without_overlap_without_remainder_3d(self):
-        self._test_without_overlap_without_remainder(spatial_dims=3, patch_size_range=(50, 500), image_size_multiple=(1, 50))
+        self._test_without_overlap_without_remainder(spatial_dims=3, patch_size_range=(25000, 250000), image_size_multiple=(1, 25000))
 
     def test_without_overlap_with_remainder_3d(self):
-        self._test_without_overlap_with_remainder(spatial_dims=3, patch_size_range=(50, 500), image_size_max=5000)
+        self._test_without_overlap_with_remainder(spatial_dims=3, patch_size_range=(25000, 250000), image_size_max=2500000)
 
     def test_with_overlap_without_remainder_3d(self):
-        self._test_with_overlap_without_remainder(spatial_dims=3, patch_overlap_size_range=(50, 500), patch_size_range=(1, 10), image_size_multiple=(1, 50))
+        self._test_with_overlap_without_remainder(spatial_dims=3, patch_overlap_size_range=(25000, 250000), patch_size_range=(1, 100), image_size_multiple=(1, 25000))
 
     def test_with_overlap_with_remainder_3d(self):
-        self._test_with_overlap_with_remainder(spatial_dims=3, patch_overlap_size_range=(50, 500), patch_size_range=(1, 10), image_size_max=5000)
+        self._test_with_overlap_with_remainder(spatial_dims=3, patch_overlap_size_range=(25000, 250000), patch_size_range=(1, 100), image_size_max=2500000)
 
     def test_without_overlap_without_remainder_Nd(self):
         spatial_dims = random.randint(1, 5)
-        self._test_without_overlap_without_remainder(spatial_dims=spatial_dims, patch_size_range=(50, 500), image_size_multiple=(1, 50))
+        self._test_without_overlap_without_remainder(spatial_dims=spatial_dims, patch_size_range=(25000, 250000), image_size_multiple=(1, 25000))
 
     def test_without_overlap_with_remainder_Nd(self):
         spatial_dims = random.randint(1, 5)
-        self._test_without_overlap_with_remainder(spatial_dims=spatial_dims, patch_size_range=(50, 500), image_size_max=5000)
+        self._test_without_overlap_with_remainder(spatial_dims=spatial_dims, patch_size_range=(25000, 250000), image_size_max=2500000)
 
     def test_with_overlap_without_remainder_Nd(self):
         spatial_dims = random.randint(1, 5)
-        self._test_with_overlap_without_remainder(spatial_dims=spatial_dims, patch_overlap_size_range=(50, 500), patch_size_range=(1, 10), image_size_multiple=(1, 50))
+        self._test_with_overlap_without_remainder(spatial_dims=spatial_dims, patch_overlap_size_range=(25000, 250000), patch_size_range=(1, 100), image_size_multiple=(1, 25000))
 
     def test_with_overlap_with_remainder_Nd(self):
         spatial_dims = random.randint(1, 5)
-        self._test_with_overlap_with_remainder(spatial_dims=spatial_dims, patch_overlap_size_range=(50, 500), patch_size_range=(1, 10), image_size_max=5000)
+        self._test_with_overlap_with_remainder(spatial_dims=spatial_dims, patch_overlap_size_range=(25000, 250000), patch_size_range=(1, 100), image_size_max=2500000)
 
     def test_without_channel(self):
         pass

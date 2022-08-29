@@ -1,6 +1,6 @@
 import numpy as np
 
-x = 50
+x = 100
 
 print("2: {} -> {}".format(np.power(x, 1/2), np.power(np.power(x, 1/2), 2)))
 print("3: {} -> {}".format(np.power(x, 1/3), np.power(np.power(x, 1/3), 3)))

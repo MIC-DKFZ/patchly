@@ -1,5 +1,4 @@
 import unittest
-import random
 import numpy as np
 import zarr
 from samplify.sampler import BasicGridSampler

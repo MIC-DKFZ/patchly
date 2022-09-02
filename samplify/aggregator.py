@@ -1,5 +1,5 @@
 import numpy as np
-from sampler import BasicGridSampler, GridSampler
+from samplify.sampler import BasicGridSampler, GridSampler
 from slicer import slicer
 from scipy.ndimage.filters import gaussian_filter
 from collections import defaultdict

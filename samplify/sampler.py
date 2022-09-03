@@ -184,18 +184,46 @@ class ChunkedGridSampler:
     def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, chunk_size=None, channel_first=True):
         self.image = image
         self.image_size = np.asarray(image_size)
-        self.patch_size = np.asarray(patch_size)
-        self.patch_overlap = np.asarray(patch_overlap)
-        self.chunk_size = np.asarray(chunk_size)
+        self.set_patch_size(patch_size)
+        self.set_patch_overlap(patch_overlap)
+        self.set_chunk_size(chunk_size)
         self.channel_first = channel_first
-
-        if (self.chunk_size % self.patch_size != 0).any():
-            raise RuntimeError("Chunk size needs to be  a multiple of patch size.")
+        self.check_sanity()
 
         self.compute_indices()
         self.compute_length()
         self.chunk_index = 0
         self.patch_index = 0
+
+    def set_patch_size(self, patch_size):
+        if patch_size is not None:
+            self.patch_size = np.asarray(patch_size)
+        else:
+            raise RuntimeError("patch_size must be given.")
+
+    def set_patch_overlap(self, patch_overlap):
+        if patch_overlap is None:
+            self.patch_overlap = self.patch_size
+        else:
+            self.patch_overlap = np.asarray(patch_overlap)
+
+    def set_chunk_size(self, chunk_size):
+        if chunk_size is not None:
+            self.chunk_size = np.asarray(chunk_size)
+        else:
+            raise RuntimeError("chunk_size must be given.")
+
+    def check_sanity(self):
+        if self.image_size is None:
+            raise RuntimeError("image_size must be given.")
+        if np.any(self.patch_size > self.image_size):
+            raise RuntimeError("patch_size is larger than image_size for at least one axis, which is not allowed.")
+        if np.any(self.patch_overlap > self.patch_size):
+            raise RuntimeError("patch_overlap is larger than patch_size for at least one axis, which is not allowed.")
+        if len(self.image_size) != len(self.patch_size) or len(self.patch_size) != len(self.patch_overlap):
+            raise RuntimeError("image_size, patch_size and patch_overlap are required to have the same dimensionality.")
+        if (self.chunk_size % self.patch_size != 0).any() or np.any(self.patch_size >= self.chunk_size):
+            raise RuntimeError("Chunk size needs to be larger and a multiple of patch size.")
 
     def compute_indices(self):
         self.grid_sampler = GridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
@@ -208,7 +236,7 @@ class ChunkedGridSampler:
             chunk_indices = chunk_indices.reshape(-1, 2)
             chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
             self.chunk_sampler.append(
-                GridSampler(image_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))
+                GridSampler(image_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))  # TODO: Replace with BasicGridSampler???
             self.chunk_sampler_offset.append(copy.copy(chunk_indices[:, 0]))
 
     def compute_length(self):

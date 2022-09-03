@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import zarr
-from samplify.sampler import ChunkedGridSampler
+from samplify.sampler import _ChunkedGridSampler
 from samplify.slicer import slicer
 
 
@@ -14,7 +14,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -26,7 +26,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -43,7 +43,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -55,7 +55,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -73,7 +73,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -85,7 +85,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -103,7 +103,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -115,7 +115,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -132,7 +132,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -144,7 +144,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -161,7 +161,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -173,7 +173,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -191,7 +191,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -203,7 +203,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -221,7 +221,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -233,7 +233,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -250,7 +250,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -262,7 +262,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -279,7 +279,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -291,7 +291,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -309,7 +309,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -321,7 +321,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -339,7 +339,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -351,7 +351,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -369,7 +369,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -382,7 +382,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -401,7 +401,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -414,7 +414,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -433,7 +433,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -446,7 +446,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -465,7 +465,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -478,7 +478,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -497,7 +497,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for patch, (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -509,7 +509,7 @@ class TestChunkedGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
         for (patch_indices, chunk_id) in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -524,7 +524,7 @@ class TestChunkedGridSampler(unittest.TestCase):
         image = np.random.random(image_size)
         image = zarr.array(image)
 
-        self.assertRaises(RuntimeError, ChunkedGridSampler, image=image, image_size=image_size, chunk_size=chunk_size)
+        self.assertRaises(RuntimeError, _ChunkedGridSampler, image=image, image_size=image_size, chunk_size=chunk_size)
 
     def test_without_chunk_size(self):
         patch_size = (10, 10)
@@ -532,7 +532,7 @@ class TestChunkedGridSampler(unittest.TestCase):
         image = np.random.random(image_size)
         image = zarr.array(image)
 
-        self.assertRaises(RuntimeError, ChunkedGridSampler, image=image, image_size=image_size, patch_size=patch_size)
+        self.assertRaises(RuntimeError, _ChunkedGridSampler, image=image, image_size=image_size, patch_size=patch_size)
 
     def test_patch_size_larger_than_image_size(self):
         patch_size = (101, 100)
@@ -541,7 +541,7 @@ class TestChunkedGridSampler(unittest.TestCase):
         image = np.random.random(image_size)
         image = zarr.array(image)
 
-        self.assertRaises(RuntimeError, ChunkedGridSampler, image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
+        self.assertRaises(RuntimeError, _ChunkedGridSampler, image=image, image_size=image_size, patch_size=patch_size, chunk_size=chunk_size)
 
     def test_overlap_size_larger_than_patch_size(self):
         patch_overlap = (11, 10)
@@ -550,7 +550,7 @@ class TestChunkedGridSampler(unittest.TestCase):
         chunk_size = (40, 40)
         image = np.random.random(image_size)
 
-        self.assertRaises(RuntimeError, ChunkedGridSampler, image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+        self.assertRaises(RuntimeError, _ChunkedGridSampler, image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
     def get_slices(self, image, image_size, patch_indices, channel_first):
         non_image_dims = len(image.shape) - len(image_size)

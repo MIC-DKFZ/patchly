@@ -2,7 +2,7 @@ import unittest
 import random
 import numpy as np
 import zarr
-from samplify.sampler import BasicGridSampler
+from samplify.sampler import _BasicGridSampler
 from samplify.slicer import slicer
 
 
@@ -76,7 +76,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}".format(spatial_dims, len(sampler), image_size, patch_size))
 
@@ -91,7 +91,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size)
 
         for patch_indices in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -122,7 +122,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}".format(spatial_dims, len(sampler), image_size, patch_size))
 
@@ -137,7 +137,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size)
 
         for patch_indices in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -170,7 +170,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}".format(spatial_dims, len(sampler), image_size, patch_size))
 
@@ -185,7 +185,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size)
 
         for patch_indices in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -217,7 +217,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, channel_first=channel_first)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}".format(spatial_dims, len(sampler), image_size, patch_size))
 
@@ -232,7 +232,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size)
 
         for patch_indices in sampler:
             slices = self.get_slices(result, image_size, patch_indices, channel_first)
@@ -260,7 +260,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}".format(spatial_dims, len(sampler), image_size, patch_size))
 
@@ -274,7 +274,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size)
 
         for patch_indices in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -298,7 +298,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         with self.assertRaises(ValueError) as cm:
-            BasicGridSampler(image=image, image_size=image_size)
+            _BasicGridSampler(image=image, image_size=image_size)
             self.fail("image shape: {}".format(image.shape))
         # self.assertRaises(RuntimeError, BasicGridSampler, image=image, image_size=image_size)
 
@@ -317,7 +317,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         with self.assertRaises(ValueError) as cm:
-            BasicGridSampler(image=image, image_size=image_size)
+            _BasicGridSampler(image=image, image_size=image_size)
             self.fail("image shape: {}, patch shape: {}".format(patch_size, image_size))
         # self.assertRaises(RuntimeError, BasicGridSampler, image=image, image_size=patch_size, patch_size=image_size)
 
@@ -338,7 +338,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         with self.assertRaises(ValueError) as cm:
-            BasicGridSampler(image=image, image_size=image_size)
+            _BasicGridSampler(image=image, image_size=image_size)
             self.fail("image shape: {}, patch shape: {}, patch overlap: {}".format(patch_size, image_size, patch_overlap, patch_size))
         # self.assertRaises(RuntimeError, BasicGridSampler, image=image, image_size=image_size, patch_size=patch_overlap, patch_overlap=patch_size)
 
@@ -352,7 +352,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}".format(spatial_dims, len(sampler), image_size, patch_size))
 
@@ -366,7 +366,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size)
 
         for patch_indices in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -386,7 +386,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros(quotient_size)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}".format(spatial_dims, len(sampler), image_size, patch_size))
 
@@ -400,7 +400,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros(quotient_size)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size)
 
         for patch_indices in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -421,7 +421,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}, patch_overlap: {}".format(spatial_dims, len(sampler), image_size, patch_size, patch_overlap))
 
@@ -435,7 +435,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
 
         for patch_indices in sampler:
             result[slicer(result, patch_indices)] = 1
@@ -457,7 +457,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test with image
         result = np.zeros(quotient_size)
-        sampler = BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
+        sampler = _BasicGridSampler(image=image, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
         if self.enable_prints:
             print("Dim: {}, sampler len: {}, image_size: {}, patch_size: {}, patch_overlap: {}".format(spatial_dims, len(sampler), image_size, patch_size, patch_overlap))
 
@@ -471,7 +471,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros(quotient_size)
-        sampler = BasicGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
+        sampler = _BasicGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
 
         for patch_indices in sampler:
             result[slicer(result, patch_indices)] = 1

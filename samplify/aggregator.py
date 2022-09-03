@@ -1,5 +1,5 @@
 import numpy as np
-from samplify.sampler import BasicGridSampler, GridSampler
+from samplify.sampler import _BasicGridSampler, _GridSampler
 from slicer import slicer
 from scipy.ndimage.filters import gaussian_filter
 from collections import defaultdict
@@ -59,7 +59,7 @@ class Aggregator:
             self.image = self.image / self.weight_map.astype(self.image.dtype)
             self.image = np.nan_to_num(self.image)
         else:
-            sampler = GridSampler(image_size=self.image_size, patch_size=patch_size)
+            sampler = _GridSampler(image_size=self.image_size, patch_size=patch_size)
             for patch_indices in sampler:
                 slices = self.get_slices(self.image, patch_indices)
                 image_patch = self.image[slicer(self.image, slices)]
@@ -166,7 +166,7 @@ class WeightedSoftmaxAggregator(WeightedAggregator):
         if isinstance(patch_size, bool) and not patch_size:
             output = self.image.argmax(axis=0)
         else:
-            sampler = GridSampler(image_size=self.image_size, patch_size=patch_size)
+            sampler = _GridSampler(image_size=self.image_size, patch_size=patch_size)
             for patch_indices in sampler:
                 slices = self.get_slices(self.image, patch_indices)
                 image_patch = self.image[slicer(self.image, slices)]
@@ -195,7 +195,7 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def compute_indices(self):
-        self.grid_sampler = GridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
+        self.grid_sampler = _GridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
         # TODO: Check if ChunkGridSampler still works with this
         # self.grid_sampler = AdaptiveGridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, min_overlap=self.patch_size)
         self.chunk_sampler = []
@@ -205,7 +205,7 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
 
         for chunk_id, chunk_indices in enumerate(self.chunk_indices):
             chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
-            sampler = BasicGridSampler(image_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap)
+            sampler = _BasicGridSampler(image_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap)
             sampler_offset = copy.copy(chunk_indices[:, 0])
             self.chunk_sampler.append(sampler)
             self.chunk_sampler_offset.append(sampler_offset)
@@ -357,7 +357,7 @@ class ResizeChunkedWeightedSoftmaxAggregator(ChunkedWeightedSoftmaxAggregator):
 
 
 if __name__ == '__main__':
-    from sampler import ChunkedGridSampler
+    from sampler import _ChunkedGridSampler
     import zarr
     from tqdm import tqdm
 
@@ -371,7 +371,7 @@ if __name__ == '__main__':
     # result = np.zeros(image_size, dtype=np.uint8)
     result = zarr.open("tmp.zarr", mode='w', shape=image_size, chunks=chunk_size, dtype=np.uint8)
 
-    grid_sampler = ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+    grid_sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
     aggregrator = ChunkedWeightedSoftmaxAggregator(image=result, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
     print(len(grid_sampler))

@@ -50,7 +50,7 @@ class GridSampler:
     def create_sampler(self):
         if self.mode == "sample_edge" and self.chunk_size is None:
             sampler = _GridSampler(image=self.image, image_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, channel_first=not self.spatial_first)
-        if self.mode == "sample_edge" and self.chunk_size is not None:
+        elif self.mode == "sample_edge" and self.chunk_size is not None:
             sampler = _ChunkedGridSampler(image=self.image, image_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
                                           channel_first=not self.spatial_first)
         elif self.mode == "sample_adaptive" and self.chunk_size is None:
@@ -337,6 +337,10 @@ class _ChunkedGridSampler:
         self.length.extend([len(sampler) for sampler in self.chunk_sampler])
         self.length = np.cumsum(self.length)
 
+    def __iter__(self):
+        self.index = 0
+        return self
+
     def __len__(self):
         return self.length[-1]
 
@@ -362,6 +366,14 @@ class _ChunkedGridSampler:
             return patch_dict, (patch_indices, chunk_id)
         else:
             return (patch_indices, chunk_id)
+
+    def __next__(self):
+        if self.index < self.__len__():
+            output = self.__getitem__(self.index)
+            self.index += 1
+            return output
+        else:
+            raise StopIteration
 
     def get_slices(self, image, patch_indices):
         non_image_dims = len(image.shape) - len(self.image_size)

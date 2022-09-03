@@ -73,7 +73,11 @@ class GridSampler:
         if np.any(self.patch_size > self.spatial_size):
             raise RuntimeError("The patch size ({}) cannot be larger than the spatial size ({}).".format(self.patch_size, self.spatial_size))
         if self.patch_overlap is not None and np.any(self.patch_overlap > self.patch_size):
-            raise RuntimeError("The patch overlap ({}) cannot be larger than the patch size ({}).".format(self.patch_size, self.spatial_size))
+            raise RuntimeError("The patch overlap ({}) cannot be larger than the patch size ({}).".format(self.patch_overlap, self.patch_size))
+        if self.chunk_size is not None and np.any(self.chunk_size > self.spatial_size):
+            raise RuntimeError("The chunk size ({}) cannot be larger than the spatial size ({}).".format(self.chunk_size, self.spatial_size))
+        if self.chunk_size is not None and np.any(self.patch_size > self.chunk_size):
+            raise RuntimeError("The patch size ({}) cannot be larger than the chunk size ({}).".format(self.patch_size, self.chunk_size))
         if len(self.spatial_size) != len(self.patch_size):
             raise RuntimeError("The dimensionality of the patch size ({}) is required to be the same as the spatial size ({})."
                                .format(self.patch_size, self.spatial_size))

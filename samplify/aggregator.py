@@ -10,7 +10,8 @@ import numpy.typing as npt
 
 
 class Aggregator:
-    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], output_size: Union[Tuple, npt.ArrayLike] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True):
+    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], output_size: Union[Tuple, npt.ArrayLike] = None,
+                 output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True, softmax_dim: Optional[int] = None):
         """
         Aggregator to assemble an image with continuous content from patches. The content of overlapping patches is averaged.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
@@ -27,6 +28,7 @@ class Aggregator:
         self.weight_map = np.zeros(self.spatial_size, dtype=np.uint16)
         self.weight_patch = self.set_weight_patch(weights)
         self.computed_inplace = False
+        self.softmax_dim = softmax_dim
         self.check_sanity()
 
     def set_output(self, output, output_size):
@@ -75,15 +77,18 @@ class Aggregator:
         :return: The final aggregated output.
         """
         if not inplace:
-            output = self.output / self.weight_map.astype(self.output.dtype)
-            output = np.nan_to_num(output)
-            return output
+            output = np.zeros_like(self.output)
         else:
-            if not self.computed_inplace:
-                self.output = self.output / self.weight_map.astype(self.output.dtype)
-                self.output = np.nan_to_num(self.output)
+            output = self.output
+
+        if not inplace or (inplace and not self.computed_inplace):
+            output[...] = self.output / self.weight_map.astype(self.output.dtype)
+            output[...] = np.nan_to_num(output)
+            if self.softmax_dim is not None:
+                output[...] = output.argmax(axis=self.softmax_dim)
+            if inplace:
                 self.computed_inplace = True
-            return self.output
+        return output
 
     def create_gaussian_weights(self, size):
         sigma_scale = 1. / 8
@@ -106,53 +111,7 @@ class Aggregator:
         return slices
 
 
-class WeightedSoftmaxAggregator(Aggregator):
-    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True):
-        """
-        Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
-        Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
-        Is mainly intended to be used with the GridSampler, but can technically be used with any sampler.
-        :param output: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
-        :param spatial_size: The image size that was used for patchification without batch and channel dimensions. Always required.
-        :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
-        :param weights: A weight map of size patch_size that should be used for weighting the importance of each value in a patch. Default is a gaussian weight map.
-        """
-        super().__init__(spatial_size=spatial_size, patch_size=patch_size, output=output, weights=weights, spatial_first=spatial_first)
-
-    def append(self, patch, patch_indices):
-        """
-        Appends a patch to the image.
-        :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
-        :param patch_indices: The patch indices in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
-        """
-        slices = self.add_non_spatial_dims(self.image, patch_indices)
-        self.image[slicer(self.image, slices)] += patch.astype(self.image.dtype) * self.weight_patch.astype(self.image.dtype)
-
-    def get_output(self, patch_size=False, output=None):
-        """
-        Computes and returns the final aggregated output image based on all provided patches. The content of overlapping patches is averaged.
-        In case the image is a larger-than-RAM image and if the image format supports chunk-loading then defining patch_size enables a chunk-based computation.
-        :param patch_size: The shape of patch that should be used for aggregation without batch and channel dimensions. Only required if a chunk-based computation is desired.
-        The patch size can be different to the patch size of any previous patchification processes like that of the GridSampler.
-        :return: The final aggregated output image.
-        """
-        if output is None:
-            output = np.zeros(self.output.shape, dtype=np.uint16)
-
-        self.image = np.array(self.output)
-        if isinstance(patch_size, bool) and not patch_size:
-            output = self.image.argmax(axis=0)
-        else:
-            sampler = _EdgeGridSampler(spatial_size=self.spatial_size, patch_size=patch_size)
-            for patch_indices in sampler:
-                slices = self.add_non_spatial_dims(self.image, patch_indices)
-                image_patch = self.image[slicer(self.image, slices)]
-                image_patch = image_patch.argmax(axis=0)
-                output[slicer(output, slices)[1:]] = image_patch
-        return output
-
-
-class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
+class ChunkedWeightedSoftmaxAggregator(Aggregator):
     def __init__(self, output=None, spatial_size=None, patch_size=None, patch_overlap=None, chunk_size=None, weights='gaussian', spatial_first=True, argmax=True):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.

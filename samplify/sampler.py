@@ -11,7 +11,7 @@ import numpy.typing as npt
 
 class GridSampler:
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Optional[Union[Tuple, npt.ArrayLike]] = None,
-                 chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = "sample_edge"):
+                 chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = 'sample_edge'):
         """
         TODO description
         If no image is given then only patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
@@ -261,7 +261,7 @@ class _AdaptiveGridSampler(_CropGridSampler):
 
 
 class _ChunkedGridSampler(_CropGridSampler):
-    def __init__(self, spatial_size: np.ndarray, patch_size: np.ndarray, chunk_size: np.ndarray, patch_overlap: np.ndarray, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = "sample_edge"):
+    def __init__(self, spatial_size: np.ndarray, patch_size: np.ndarray, chunk_size: np.ndarray, patch_overlap: np.ndarray, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = 'sample_edge'):
         self.chunk_size = chunk_size
         self.mode = mode
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)

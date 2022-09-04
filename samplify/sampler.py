@@ -65,7 +65,7 @@ class GridSampler:
         elif self.mode == "sample_adaptive" and self.chunk_size is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         elif self.mode == "sample_crop" and self.chunk_size is None:
-            sampler = _BasicGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
+            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
         elif self.mode == "sample_crop" and self.chunk_size is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         elif self.mode.startswith('pad_') and self.chunk_size is None:
@@ -112,7 +112,7 @@ class GridSampler:
         return self.sampler.__next__()
 
 
-class _BasicGridSampler:
+class _CropGridSampler:
     def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
         """
         TODO Redo doc
@@ -194,7 +194,7 @@ class _BasicGridSampler:
         return slices
 
 
-class _EdgeGridSampler(_BasicGridSampler):
+class _EdgeGridSampler(_CropGridSampler):
     def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
         """
         TODO Redo doc
@@ -235,7 +235,7 @@ class _EdgeGridSampler(_BasicGridSampler):
         return indices
 
 
-class _AdaptiveGridSampler(_BasicGridSampler):
+class _AdaptiveGridSampler(_CropGridSampler):
     def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
         # TODO: When used in ChunkedGridSampler the adaptive patches should have a minimum size of patch size
         # TODO: Do doc
@@ -259,7 +259,7 @@ class _AdaptiveGridSampler(_BasicGridSampler):
         return slice_result
 
 
-class _ChunkedGridSampler(_BasicGridSampler):
+class _ChunkedGridSampler(_CropGridSampler):
     def __init__(self, spatial_size, patch_size, chunk_size, patch_overlap=None, image=None, spatial_first=True):
         self.chunk_size = chunk_size
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)

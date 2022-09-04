@@ -1,5 +1,5 @@
 import numpy as np
-from samplify.sampler import _BasicGridSampler, _EdgeGridSampler
+from samplify.sampler import _CropGridSampler, _EdgeGridSampler
 from slicer import slicer
 from scipy.ndimage.filters import gaussian_filter
 from collections import defaultdict
@@ -205,7 +205,7 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
 
         for chunk_id, chunk_indices in enumerate(self.chunk_indices):
             chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
-            sampler = _BasicGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap)
+            sampler = _CropGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap)
             sampler_offset = copy.copy(chunk_indices[:, 0])
             self.chunk_sampler.append(sampler)
             self.chunk_sampler_offset.append(sampler_offset)

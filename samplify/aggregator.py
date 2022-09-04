@@ -5,140 +5,119 @@ from scipy.ndimage.filters import gaussian_filter
 from collections import defaultdict
 import copy
 import concurrent.futures
+from typing import Union, Optional, Tuple, Callable
+import numpy.typing as npt
 
 
 class Aggregator:
-    def __init__(self, image=None, image_size=None, channel_first=True):
+    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], output_size: Union[Tuple, npt.ArrayLike] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True):
         """
         Aggregator to assemble an image with continuous content from patches. The content of overlapping patches is averaged.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
         Is mainly intended to be used with the GridSampler, but can technically be used with any sampler.
-        :param image: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
-        :param image_size: The image size that was used for patchification without batch and channel dimensions. Always required.
+        :param output: A numpy-style zero-initialized output (Numpy, Samplify.Subject, Tensor, Zarr, Dask, ...) of a continuous data type.
+        If none then a zero-initialized Numpy output array of data type np.float32 is created internally.
+        :param spatial_size: The image size that was used for patchification without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         """
-        self.channel_first = channel_first
-        self.image_size = np.asarray(image_size)
-        self.set_image(image)
-        # self.patch_size = np.asarray(patch_size)
-        # self.set_weights(self.patch_size, None)
-        self.weight_map = np.zeros(self.image_size, dtype=np.uint8)
+        self.spatial_size = np.asarray(spatial_size)
+        self.patch_size = np.asarray(patch_size)
+        self.output = self.set_output(output, output_size)
+        self.spatial_first = spatial_first
+        self.weight_map = np.zeros(self.spatial_size, dtype=np.uint16)
+        self.weight_patch = self.set_weight_patch(weights)
+        self.computed_inplace = False
+        self.check_sanity()
 
-    def set_image(self, image):
-        if image is not None:
-            self.image = image
+    def set_output(self, output, output_size):
+        if output is None and output_size is not None:
+            output = np.zeros(output_size, dtype=np.float32)
+            return output
+        elif output is None and output_size is None:
+            raise RuntimeError("Either the output array-like data or the output size must be given.")
+        elif output is not None and output_size is not None and output.shape != output_size:
+            raise RuntimeError("The variable output_size must be equal to the output shape if both are given. Only one of the two must be given.")
+
+    def check_sanity(self):
+        if np.any(self.patch_size > self.spatial_size):
+            raise RuntimeError("The patch size ({}) cannot be larger than the spatial size ({}).".format(self.patch_size, self.spatial_size))
+        # TODO: Check spatial_size == output.shape. Consider non-spatial dims and spatial_first
+        # TODO: Check spatial_size == output_size. Consider non-spatial dims and spatial_first
+
+    def set_weight_patch(self, weights):
+        if weights == 'avg':
+            weight_patch = np.ones(patch.shape, dtype=np.uint8)
+        elif weights == 'gaussian':
+            weight_patch = self.create_gaussian_weights(self.patch_size)
+        elif callable(weights):
+            weight_patch = weights
         else:
-            self.image = np.zeros(self.image_size, dtype=np.float32)
-
-    # def set_weights(self, size, weights):
-        # self.weight_map = np.zeros(self.image_size, dtype=np.uint8)
-        # self.weight_patch = np.ones(size, dtype=np.uint8)
+            raise RuntimeError("The given type of weights is not supported.")
+        return weight_patch
 
     def append(self, patch, patch_indices):
         """
-        Appends a patch to the image.
+        Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
         :param patch_indices: The patch indices in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
         """
-        slices = self.get_slices(self.image, patch_indices)
-        weight_patch = np.ones(patch.shape, dtype=np.uint8)
-        self.image[slicer(self.image, slices)] += patch.astype(self.image.dtype) * weight_patch.astype(self.image.dtype)
-        weight_map_patch = self.weight_map[slicer(self.weight_map, patch_indices)]
-        # weight_map_patch[...] += self.weight_patch
-        weight_map_patch[...] += weight_patch
+        if self.computed_inplace:
+            raise RuntimeError("get_output() has already been called with inplace=True. Therefore, no further patches can be appended.")
+        slices = self.add_non_spatial_dims(self.output, patch_indices)
+        self.output[slicer(self.output, slices)] += patch.astype(self.output.dtype) * self.weight_patch.astype(self.output.dtype)
+        weight_map_patch = self.weight_map[slicer(self.weight_map, patch_indices)]  # weight_map_patch is only a reference to a patch in self.weight_map
+        weight_map_patch[...] += self.weight_patch  # Adds patch to the map. [...] enables the use of memory-mapped array-like data
 
-    def get_output(self, patch_size=False, inplace=False):  # Add inplace option with image instead of sel.image for result storage
+    def get_output(self, inplace=False):
         """
-        Computes and returns the final aggregated output image based on all provided patches. The content of overlapping patches is averaged.
-        In case the image is a larger-than-RAM image and if the image format supports chunk-loading then defining patch_size enables a chunk-based computation.
-        :param patch_size: The shape of patch that should be used for aggregation without batch and channel dimensions. Only required if a chunk-based computation is desired.
-        The patch size can be different to the patch size of any previous patchification processes like that of the GridSampler.
-        :return: The final aggregated output image.
+        Computes and returns the final aggregated output based on all provided patches. The content of overlapping patches is averaged.
+        :param inplace: Computes the output inplace without allocating new memory. Afterwards, no further patches can be appended.
+        :return: The final aggregated output.
         """
-        if isinstance(patch_size, bool) and not patch_size:
-            self.image = self.image / self.weight_map.astype(self.image.dtype)
-            self.image = np.nan_to_num(self.image)
+        if not inplace:
+            output = self.output / self.weight_map.astype(self.output.dtype)
+            output = np.nan_to_num(output)
+            return output
         else:
-            sampler = _EdgeGridSampler(spatial_size=self.image_size, patch_size=patch_size)
-            for patch_indices in sampler:
-                slices = self.get_slices(self.image, patch_indices)
-                image_patch = self.image[slicer(self.image, slices)]
-                weight_map_patch = self.weight_map[slicer(self.weight_map, patch_indices)]
-                image_patch = image_patch / weight_map_patch.astype(self.image.dtype)
-                image_patch = np.nan_to_num(image_patch)
-                self.image[slicer(self.image, slices)] = image_patch
-        return self.image
+            if not self.computed_inplace:
+                self.output = self.output / self.weight_map.astype(self.output.dtype)
+                self.output = np.nan_to_num(self.output)
+                self.computed_inplace = True
+            return self.output
 
-    def get_slices(self, image, patch_indices):
-        non_image_dims = len(image.shape) - len(self.image_size)
-        if self.channel_first:
-            slices = [None] * non_image_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        else:
-            slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([None] * non_image_dims)
-        return slices
-
-
-class WeightedAggregator(Aggregator):
-    def __init__(self, image=None, image_size=None, patch_size=None, weights='gaussian', channel_first=True):
-        """
-        Weighted aggregator to assemble an image with continuous content from patches. The content of overlapping patches is gaussian-weighted by default.
-        Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
-        Is mainly intended to be used with the GridSampler, but can technically be used with any sampler.
-        :param image: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
-        :param image_size: The image size that was used for patchification without batch and channel dimensions. Always required.
-        :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
-        :weights: A weight map of size patch_size that should be used for weighting the importance of each value in a patch. Default is a gaussian weight map.
-        """
-        super().__init__(image, image_size, channel_first=channel_first)
-        self.patch_size = np.asarray(patch_size)
-        self.set_weights(self.patch_size, weights)
-
-    def set_weights(self, size, weights):
-        if weights == 'gaussian':
-            self.weight_map = np.zeros(self.image_size, dtype=np.uint16)
-            self.weight_patch = self.gaussian_weights(size, center_value=255, dtype=np.uint16)
-        else:
-            self.weight_patch = weights
-
-    def gaussian_weights(self, size, center_value, dtype):
+    def create_gaussian_weights(self, size):
         sigma_scale = 1. / 8
         sigmas = size * sigma_scale
         center_coords = size // 2
         tmp = np.zeros(size)
         tmp[tuple(center_coords)] = 1
         gaussian_weights = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
-        # gaussian_weights = np.rint(normalize(gaussian_weights) * center_value).astype(dtype)
-        # gaussian_weights += 1
         gaussian_weights[gaussian_weights == 0] = np.min(gaussian_weights[gaussian_weights != 0])
-        # import SimpleITK as sitk
-        # sitk.WriteImage(sitk.GetImageFromArray(gaussian_weights), "/home/k539i/Documents/datasets/original/2021_Gotkowski_HZDR-HIF/tmp/tmp.nii.gz")
         return gaussian_weights
 
+    def add_non_spatial_dims(self, output, patch_indices):
+        non_spatial_dims = len(output.shape) - len(self.spatial_size)
+        if self.spatial_first:
+            slices = [None] * non_spatial_dims
+            slices.extend([index_pair.tolist() for index_pair in patch_indices])
+        else:
+            slices = [index_pair.tolist() for index_pair in patch_indices]
+            slices.extend([None] * non_spatial_dims)
+        return slices
 
-class WeightedSoftmaxAggregator(WeightedAggregator):
-    def __init__(self, image=None, image_size=None, patch_size=None, weights='gaussian', low_memory_mode=False, channel_first=True):
+
+class WeightedSoftmaxAggregator(Aggregator):
+    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
         Is mainly intended to be used with the GridSampler, but can technically be used with any sampler.
-        :param image: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
-        :param image_size: The image size that was used for patchification without batch and channel dimensions. Always required.
+        :param output: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
+        :param spatial_size: The image size that was used for patchification without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param weights: A weight map of size patch_size that should be used for weighting the importance of each value in a patch. Default is a gaussian weight map.
-        :param low_memory_mode: Reduces memory consumption by more than 50% in comparison to the normal WeightedAggregator and Aggregator. However, the prediction quality is slightly reduced.
         """
-        self.low_memory_mode = low_memory_mode
-        super().__init__(image, image_size, patch_size, weights, channel_first=channel_first)
-
-    def set_weights(self, size, weights):
-        if weights == 'gaussian' and not self.low_memory_mode:
-            self.weight_patch = self.gaussian_weights(size, center_value=255, dtype=np.uint16)
-        elif weights == 'gaussian' and self.low_memory_mode:
-            self.weight_patch = self.gaussian_weights(size, center_value=63, dtype=np.uint8)
-        else:
-            self.weight_patch = weights
+        super().__init__(spatial_size=spatial_size, patch_size=patch_size, output=output, weights=weights, spatial_first=spatial_first)
 
     def append(self, patch, patch_indices):
         """
@@ -146,9 +125,7 @@ class WeightedSoftmaxAggregator(WeightedAggregator):
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
         :param patch_indices: The patch indices in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
         """
-        if self.low_memory_mode:
-            patch = np.rint(patch * 500).astype(self.image.dtype)  # 255
-        slices = self.get_slices(self.image, patch_indices)
+        slices = self.add_non_spatial_dims(self.image, patch_indices)
         self.image[slicer(self.image, slices)] += patch.astype(self.image.dtype) * self.weight_patch.astype(self.image.dtype)
 
     def get_output(self, patch_size=False, output=None):
@@ -160,15 +137,15 @@ class WeightedSoftmaxAggregator(WeightedAggregator):
         :return: The final aggregated output image.
         """
         if output is None:
-            output = np.zeros(self.image.shape, dtype=np.uint16)
+            output = np.zeros(self.output.shape, dtype=np.uint16)
 
-        self.image = np.array(self.image)
+        self.image = np.array(self.output)
         if isinstance(patch_size, bool) and not patch_size:
             output = self.image.argmax(axis=0)
         else:
-            sampler = _EdgeGridSampler(spatial_size=self.image_size, patch_size=patch_size)
+            sampler = _EdgeGridSampler(spatial_size=self.spatial_size, patch_size=patch_size)
             for patch_indices in sampler:
-                slices = self.get_slices(self.image, patch_indices)
+                slices = self.add_non_spatial_dims(self.image, patch_indices)
                 image_patch = self.image[slicer(self.image, slices)]
                 image_patch = image_patch.argmax(axis=0)
                 output[slicer(output, slices)[1:]] = image_patch
@@ -176,18 +153,18 @@ class WeightedSoftmaxAggregator(WeightedAggregator):
 
 
 class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
-    def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, chunk_size=None, weights='gaussian', channel_first=True, argmax=True):
+    def __init__(self, output=None, spatial_size=None, patch_size=None, patch_overlap=None, chunk_size=None, weights='gaussian', spatial_first=True, argmax=True):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
         Is mainly intended to be used with the GridSampler, but can technically be used with any sampler.
-        :param image: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
-        :param image_size: The image size that was used for patchification without batch and channel dimensions. Always required.
+        :param output: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
+        :param spatial_size: The image size that was used for patchification without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param weights: A weight map of size patch_size that should be used for weighting the importance of each value in a patch. Default is a gaussian weight map.
         :param low_memory_mode: Reduces memory consumption by more than 50% in comparison to the normal WeightedAggregator and Aggregator. However, the prediction quality is slightly reduced.
         """
-        super().__init__(image, image_size, patch_size, weights, low_memory_mode=False, channel_first=channel_first)
+        super().__init__(output, spatial_size, patch_size, weights, low_memory_mode=False, spatial_first=spatial_first)
         self.patch_overlap = patch_overlap
         self.chunk_size = chunk_size
         self.argmax = argmax
@@ -195,7 +172,7 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def compute_indices(self):
-        self.grid_sampler = _EdgeGridSampler(spatial_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
+        self.grid_sampler = _EdgeGridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
         # TODO: Check if ChunkGridSampler still works with this
         # self.grid_sampler = AdaptiveGridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, min_overlap=self.patch_size)
         self.chunk_sampler = []
@@ -211,10 +188,10 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
             self.chunk_sampler_offset.append(sampler_offset)
 
             # The edges of non-border chunks need to be cropped as they have no overlap patch within the chunk
-            for axis in range(len(self.image_size)):
+            for axis in range(len(self.spatial_size)):
                 if 0 < chunk_indices[axis][0]:
                     chunk_indices[axis][0] += int(self.patch_size[axis] // 2)
-                if chunk_indices[axis][1] < self.image_size[axis]:
+                if chunk_indices[axis][1] < self.spatial_size[axis]:
                     chunk_indices[axis][1] -= int(self.patch_size[axis] // 2)
 
             for patch_indices in sampler:
@@ -256,7 +233,7 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
         for patch_indices_key, patch in self.chunk_patches_dicts[chunk_id].items():
             patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
             patch_indices -= sampler_offset
-            slices = self.get_slices(image_chunk_softmax, patch_indices)
+            slices = self.add_non_spatial_dims(image_chunk_softmax, patch_indices)
             image_chunk_softmax[slicer(image_chunk_softmax, slices)] += patch.astype(image_chunk_softmax.dtype) * self.weight_patch.astype(image_chunk_softmax.dtype)
         if self.argmax:
             # Argmax the softmax chunk
@@ -266,11 +243,11 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
         # Crop the chunk
         crop_indices = self.chunk_indices[chunk_id] - sampler_offset
         # image_chunk = image_chunk[slicer(image_chunk, crop_indices)]
-        crop_indices = self.get_slices(image_chunk, crop_indices)
+        crop_indices = self.add_non_spatial_dims(image_chunk, crop_indices)
         image_chunk = image_chunk[slicer(image_chunk, crop_indices)]
         # Write the chunk into the global image
         crop_indices = self.chunk_indices[chunk_id]
-        crop_indices = self.get_slices(self.image, crop_indices)
+        crop_indices = self.add_non_spatial_dims(self.image, crop_indices)
         self.image[slicer(self.image, crop_indices)] = image_chunk
         # Set all self.chunk_patches_dicts[chunk_id] values to None
         for key in self.chunk_patches_dicts[chunk_id].keys():
@@ -289,18 +266,18 @@ class ChunkedWeightedSoftmaxAggregator(WeightedSoftmaxAggregator):
 
 
 class ResizeChunkedWeightedSoftmaxAggregator(ChunkedWeightedSoftmaxAggregator):
-    def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, chunk_size=None, weights='gaussian', spacing=None):
+    def __init__(self, output=None, spatial_size=None, patch_size=None, patch_overlap=None, chunk_size=None, weights='gaussian', spacing=None):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
         Is mainly intended to be used with the GridSampler, but can technically be used with any sampler.
-        :param image: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
-        :param image_size: The image size that was used for patchification without batch and channel dimensions. Always required.
+        :param output: A numpy-style zero-initialized image (Numpy, Zarr, Dask, ...) of a continuous data type. If none then a zero-initialized Numpy image of data type np.float32 is created internally.
+        :param spatial_size: The image size that was used for patchification without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param weights: A weight map of size patch_size that should be used for weighting the importance of each value in a patch. Default is a gaussian weight map.
         :param low_memory_mode: Reduces memory consumption by more than 50% in comparison to the normal WeightedAggregator and Aggregator. However, the prediction quality is slightly reduced.
         """
-        super().__init__(image, image_size, patch_size, patch_overlap, chunk_size, weights)
+        super().__init__(output, spatial_size, patch_size, patch_overlap, chunk_size, weights)
         self.patch_overlap = patch_overlap
         self.chunk_size = np.asarray(chunk_size)
         self.spacing = spacing
@@ -323,7 +300,7 @@ class ResizeChunkedWeightedSoftmaxAggregator(ChunkedWeightedSoftmaxAggregator):
             patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
             patch_indices -= sampler_offset
             # patch_indices = np.rint(patch_indices * size_conversion_factor).astype(np.int32)
-            slices = self.get_slices(image_chunk_softmax, patch_indices)
+            slices = self.add_non_spatial_dims(image_chunk_softmax, patch_indices)
             image_chunk_softmax[slicer(image_chunk_softmax, slices)] += patch.astype(image_chunk_softmax.dtype) * self.weight_patch.astype(image_chunk_softmax.dtype)
         # Argmax the softmax chunk
         image_chunk = image_chunk_softmax.argmax(axis=0).astype(np.uint16)
@@ -372,7 +349,7 @@ if __name__ == '__main__':
     result = zarr.open("tmp.zarr", mode='w', shape=image_size, chunks=chunk_size, dtype=np.uint8)
 
     grid_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
-    aggregrator = ChunkedWeightedSoftmaxAggregator(image=result, image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+    aggregrator = ChunkedWeightedSoftmaxAggregator(output=result, spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
     print(len(grid_sampler))
 

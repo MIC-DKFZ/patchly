@@ -271,8 +271,6 @@ class _ChunkedGridSampler(_CropGridSampler):
 
     def compute_indices(self):
         self.grid_sampler = GridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, mode=self.mode)
-        # TODO: Check if ChunkGridSampler still works with AdaptiveGridSampler
-        # self.grid_sampler = AdaptiveGridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, min_overlap=self.patch_size)
         self.chunk_sampler = []
         self.chunk_sampler_offset = []
 

@@ -16,7 +16,7 @@ class GridSampler:
         TODO description
         If no image is given then only patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
 
-        :param image: The image in an array-like format (Numpy, Samplify.Subject, Zarr, Dask, ...) that can be memory-mapped.
+        :param image: The image in an array-like format (Numpy, Samplify.Subject, Tensor, Zarr, Dask, ...) that can be memory-mapped.
         Samplify.subject is directly supported and will sample the same patch from all stored images.
         The image can have an arbitrary number of additional non-spatial dimensions.
         :param spatial_size: The spatial shape of the image. The spatial shape excludes the channel, batch and any other non-spatial dimensionality.

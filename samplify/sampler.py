@@ -94,8 +94,8 @@ class GridSampler:
         if self.chunk_size is not None and len(self.spatial_size) != len(self.chunk_size):
             raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({})."
                                .format(self.chunk_size, self.spatial_size))
-        if self.patch_overlap is not None and (self.patch_size % self.patch_overlap != 0).any():
-            raise RuntimeError("The patch size ({}) is required to be a multiple of the patch overlap ({}).".format(self.patch_size, self.patch_overlap))
+        if self.patch_overlap is not None and self.chunk_size is not None and (self.patch_size % self.patch_overlap != 0).any():
+            raise RuntimeError("The patch size ({}) is required to be a multiple of the patch overlap ({}) when using chunked images.".format(self.patch_size, self.patch_overlap))
         if self.chunk_size is not None and (self.chunk_size % self.patch_size != 0).any():
             raise RuntimeError("The chunk size ({}) is required to be a multiple of the patch size ({}).".format(self.chunk_size, self.patch_size))
 
@@ -260,8 +260,9 @@ class _AdaptiveGridSampler(_CropGridSampler):
 
 
 class _ChunkedGridSampler(_CropGridSampler):
-    def __init__(self, spatial_size, patch_size, chunk_size, patch_overlap=None, image=None, spatial_first=True):
+    def __init__(self, spatial_size, patch_size, chunk_size, patch_overlap=None, image=None, spatial_first=True, mode: str = "sample_edge"):
         self.chunk_size = chunk_size
+        self.mode = mode
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)
 
         self.compute_length()
@@ -269,7 +270,7 @@ class _ChunkedGridSampler(_CropGridSampler):
         self.patch_index = 0
 
     def compute_indices(self):
-        self.grid_sampler = _EdgeGridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
+        self.grid_sampler = GridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, mode=self.mode)
         # TODO: Check if ChunkGridSampler still works with AdaptiveGridSampler
         # self.grid_sampler = AdaptiveGridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, min_overlap=self.patch_size)
         self.chunk_sampler = []
@@ -279,7 +280,7 @@ class _ChunkedGridSampler(_CropGridSampler):
             chunk_indices = chunk_indices.reshape(-1, 2)
             chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
             self.chunk_sampler.append(
-                _EdgeGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))  # TODO: Replace with BasicGridSampler???
+                _EdgeGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))
             self.chunk_sampler_offset.append(copy.copy(chunk_indices[:, 0]))
         return None
 

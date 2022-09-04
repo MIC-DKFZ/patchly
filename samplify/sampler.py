@@ -31,21 +31,14 @@ class GridSampler:
         :param mode: TODO
         """
         self.image = image
-        self.spatial_size = self.set_parameter(spatial_size)
-        self.patch_size = self.set_parameter(patch_size)
+        self.spatial_size = np.asarray(spatial_size)
+        self.patch_size = np.asarray(patch_size)
         self.patch_overlap = self.set_patch_overlap(patch_overlap, patch_size)
-        self.chunk_size = self.set_parameter(chunk_size)
+        self.chunk_size = self.set_chunk_size(chunk_size)
         self.spatial_first = spatial_first
         self.mode = mode
         self.check_sanity()
         self.sampler = self.create_sampler()
-
-    def set_parameter(self, parameter):
-        if parameter is None:
-            parameter = None
-        else:
-            parameter = np.asarray(parameter)
-        return parameter
 
     def set_patch_overlap(self, patch_overlap, patch_size):
         if patch_overlap is None:
@@ -53,6 +46,13 @@ class GridSampler:
         else:
             patch_overlap = np.asarray(patch_overlap)
         return patch_overlap
+
+    def set_chunk_size(self, parameter):
+        if parameter is None:
+            parameter = None
+        else:
+            parameter = np.asarray(parameter)
+        return parameter
 
     def create_sampler(self):
         if self.mode == "sample_edge" and self.chunk_size is None:
@@ -171,19 +171,19 @@ class _CropGridSampler:
 
     def slice_patch(self, patch_indices):
         if self.image is not None and not isinstance(self.image, dict):
-            slices = self.get_slices(self.image, patch_indices)
+            slices = self.add_non_spatial_dims(self.image, patch_indices)
             patch = self.image[slicer(self.image, slices)]
             return patch, patch_indices
         elif self.image is not None and isinstance(self.image, dict):
             patch_dict = {}
             for key in self.image.keys():
-                slices = self.get_slices(self.image[key], patch_indices)
+                slices = self.add_non_spatial_dims(self.image[key], patch_indices)
                 patch_dict[key] = self.image[key][slicer(self.image[key], slices)]
             return patch_dict, patch_indices
         else:
             return patch_indices
 
-    def get_slices(self, image, patch_indices):
+    def add_non_spatial_dims(self, image, patch_indices):
         non_spatial_dims = len(image.shape) - len(self.spatial_size)
         if self.spatial_first:
             slices = [None] * non_spatial_dims

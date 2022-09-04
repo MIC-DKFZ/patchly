@@ -113,7 +113,7 @@ class GridSampler:
 
 
 class _CropGridSampler:
-    def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
+    def __init__(self, spatial_size: np.ndarray, patch_size: np.ndarray, patch_overlap: np.ndarray, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
         TODO Redo doc
 
@@ -195,7 +195,7 @@ class _CropGridSampler:
 
 
 class _EdgeGridSampler(_CropGridSampler):
-    def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
+    def __init__(self, spatial_size: np.ndarray, patch_size: np.ndarray, patch_overlap: np.ndarray, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
         TODO Redo doc
 
@@ -236,7 +236,7 @@ class _EdgeGridSampler(_CropGridSampler):
 
 
 class _AdaptiveGridSampler(_CropGridSampler):
-    def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
+    def __init__(self, spatial_size: np.ndarray, patch_size: np.ndarray, patch_overlap: np.ndarray, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         # TODO: When used in ChunkedGridSampler the adaptive patches should have a minimum size of patch size
         # TODO: Do doc
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)
@@ -260,7 +260,7 @@ class _AdaptiveGridSampler(_CropGridSampler):
 
 
 class _ChunkedGridSampler(_CropGridSampler):
-    def __init__(self, spatial_size, patch_size, chunk_size, patch_overlap=None, image=None, spatial_first=True, mode: str = "sample_edge"):
+    def __init__(self, spatial_size: np.ndarray, patch_size: np.ndarray, chunk_size: np.ndarray, patch_overlap: np.ndarray, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = "sample_edge"):
         self.chunk_size = chunk_size
         self.mode = mode
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)

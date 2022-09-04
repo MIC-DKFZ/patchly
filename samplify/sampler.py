@@ -158,6 +158,18 @@ class _BasicGridSampler:
         for axis in range(len(indices)):
             patch_indices[axis][0] = indices[axis]
             patch_indices[axis][1] = indices[axis] + self.patch_size[axis]
+        slice_result = self.slice_patch(patch_indices)
+        return slice_result
+
+    def __next__(self):
+        if self.index < self.__len__():
+            output = self.__getitem__(self.index)
+            self.index += 1
+            return output
+        else:
+            raise StopIteration
+
+    def slice_patch(self, patch_indices):
         if self.image is not None and not isinstance(self.image, dict):
             slices = self.get_slices(self.image, patch_indices)
             patch = self.image[slicer(self.image, slices)]
@@ -170,14 +182,6 @@ class _BasicGridSampler:
             return patch_dict, patch_indices
         else:
             return patch_indices
-
-    def __next__(self):
-        if self.index < self.__len__():
-            output = self.__getitem__(self.index)
-            self.index += 1
-            return output
-        else:
-            raise StopIteration
 
     def get_slices(self, image, patch_indices):
         non_image_dims = len(image.shape) - len(self.spatial_size)
@@ -251,18 +255,8 @@ class _AdaptiveGridSampler(_BasicGridSampler):
         for axis in range(len(indices)):
             patch_indices[axis][0] = indices[axis]
             patch_indices[axis][1] = min(indices[axis] + self.patch_size[axis], self.spatial_size[axis])
-        if self.image is not None and not isinstance(self.image, dict):
-            slices = self.get_slices(self.image, patch_indices)
-            patch = self.image[slicer(self.image, slices)]
-            return patch, patch_indices
-        elif self.image is not None and isinstance(self.image, dict):
-            patch_dict = {}
-            for key in self.image.keys():
-                slices = self.get_slices(self.image[key], patch_indices)
-                patch_dict[key] = self.image[key][slicer(self.image[key], slices)]
-            return patch_dict, patch_indices
-        else:
-            return patch_indices
+        slice_result = self.slice_patch(patch_indices)
+        return slice_result
 
 
 class _ChunkedGridSampler(_BasicGridSampler):
@@ -306,18 +300,13 @@ class _ChunkedGridSampler(_BasicGridSampler):
 
         patch_indices = copy.copy(self.chunk_sampler[chunk_id].__getitem__(patch_id))
         patch_indices += self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
-        if self.image is not None and not isinstance(self.image, dict):
-            slices = self.get_slices(self.image, patch_indices)
-            patch = self.image[slicer(self.image, slices)]
-            return patch, (patch_indices, chunk_id)
-        elif self.image is not None and isinstance(self.image, dict):
-            patch_dict = {}
-            for key in self.image.keys():
-                slices = self.get_slices(self.image[key], patch_indices)
-                patch_dict[key] = self.image[key][slicer(self.image[key], slices)]
-            return patch_dict, (patch_indices, chunk_id)
+
+        slice_result = self.slice_patch(patch_indices)
+        if self.image is None:
+            slice_result = slice_result, chunk_id
         else:
-            return (patch_indices, chunk_id)
+            slice_result = *slice_result, chunk_id
+        return slice_result
 
 
 # class ResizeSampler(Dataset):

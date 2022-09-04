@@ -136,7 +136,6 @@ class _BasicGridSampler:
         self.patch_size = patch_size
         self.patch_overlap = patch_overlap
         self.indices = self.compute_indices()
-        self.length = len(self.indices)
 
     def compute_indices(self):
         n_axis = len(self.spatial_size)
@@ -173,7 +172,7 @@ class _BasicGridSampler:
             return patch_indices
 
     def __next__(self):
-        if self.index < self.length:
+        if self.index < self.__len__():
             output = self.__getitem__(self.index)
             self.index += 1
             return output
@@ -266,23 +265,18 @@ class _AdaptiveGridSampler(_BasicGridSampler):
             return patch_indices
 
 
-class _ChunkedGridSampler:
+class _ChunkedGridSampler(_BasicGridSampler):
     def __init__(self, spatial_size, patch_size, chunk_size, patch_overlap=None, image=None, spatial_first=True):
-        self.image = image
-        self.spatial_size = spatial_size
-        self.patch_size = patch_size
-        self.patch_overlap = patch_overlap
         self.chunk_size = chunk_size
-        self.spatial_first = spatial_first
+        super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)
 
-        self.compute_indices()
         self.compute_length()
         self.chunk_index = 0
         self.patch_index = 0
 
     def compute_indices(self):
         self.grid_sampler = _EdgeGridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
-        # TODO: Check if ChunkGridSampler still works with this
+        # TODO: Check if ChunkGridSampler still works with AdaptiveGridSampler
         # self.grid_sampler = AdaptiveGridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, min_overlap=self.patch_size)
         self.chunk_sampler = []
         self.chunk_sampler_offset = []
@@ -293,29 +287,25 @@ class _ChunkedGridSampler:
             self.chunk_sampler.append(
                 _EdgeGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))  # TODO: Replace with BasicGridSampler???
             self.chunk_sampler_offset.append(copy.copy(chunk_indices[:, 0]))
+        return None
 
     def compute_length(self):
-        self.length = [0]
-        self.length.extend([len(sampler) for sampler in self.chunk_sampler])
-        self.length = np.cumsum(self.length)
-
-    def __iter__(self):
-        self.index = 0
-        return self
+        self.cumsum_length = [0]
+        self.cumsum_length.extend([len(sampler) for sampler in self.chunk_sampler])
+        self.cumsum_length = np.cumsum(self.cumsum_length)
 
     def __len__(self):
-        return self.length[-1]
+        return self.cumsum_length[-1]
 
     def __getitem__(self, idx):
         if idx >= self.__len__():
             raise StopIteration
-        chunk_id = np.argmax(self.length > idx)
-        patch_id = idx - self.length[chunk_id - 1]
-        chunk_id -= 1  # -1 to remove the [0] appended at the start of self.length
+        chunk_id = np.argmax(self.cumsum_length > idx)
+        patch_id = idx - self.cumsum_length[chunk_id - 1]
+        chunk_id -= 1  # -1 in order to remove the [0] appended at the start of self.cumsum_length
 
         patch_indices = copy.copy(self.chunk_sampler[chunk_id].__getitem__(patch_id))
         patch_indices += self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
-        # self.patch_index += 1
         if self.image is not None and not isinstance(self.image, dict):
             slices = self.get_slices(self.image, patch_indices)
             patch = self.image[slicer(self.image, slices)]
@@ -329,131 +319,113 @@ class _ChunkedGridSampler:
         else:
             return (patch_indices, chunk_id)
 
-    def __next__(self):
-        if self.index < self.__len__():
-            output = self.__getitem__(self.index)
-            self.index += 1
-            return output
-        else:
-            raise StopIteration
 
-    def get_slices(self, image, patch_indices):
-        non_image_dims = len(image.shape) - len(self.spatial_size)
-        if self.spatial_first:
-            slices = [None] * non_image_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        else:
-            slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([None] * non_image_dims)
-        return slices
-
-
-class ResizeSampler(Dataset):
-    def __init__(self, sampler, target_size, image_size=None, patch_size=None, patch_overlap=None, mode='edge'):
-        self.sampler = sampler
-        self.target_size = target_size
-        self.mode = mode
-        # self.size_conversion_factor = size_conversion_factor
-        # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
-        # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
-        self.resized_sampler = _EdgeGridSampler(spatial_size=image_size, patch_size=patch_size,
-                                                patch_overlap=patch_overlap)
-        self.sanity_check()
-
-    def sanity_check(self):
-        if len(self.sampler) != len(self.resized_sampler):
-            raise RuntimeError("Lengths of sampler ({}) and resized_sampler ({}) do not match.".format(self.sampler.length[-1], self.resized_sampler.length[-1]))
-
-    def __getitem__(self, idx):
-        output = self.sampler.__getitem__(idx)
-        resized_patch_indices = self.resized_sampler.__getitem__(idx)
-        if len(output) == 2 and not isinstance(output[0], dict):
-            patch, patch_indices = output
-            patch = ski_transform.resize(patch, output_shape=self.target_size, order=1, mode=self.mode)
-            # patch_indices = self.resize_indices(patch_indices)
-            return patch, resized_patch_indices
-        elif len(output) == 2 and isinstance(output[0], dict):
-            patch_dict, patch_indices = output
-            for key in patch_dict.keys():
-                patch_dict[key] = ski_transform.resize(patch_dict[key], output_shape=self.target_size, order=1, mode=self.mode)
-            # patch_indices = self.resize_indices(patch_indices)
-            return patch_dict, resized_patch_indices
-        else:
-            patch_indices = output
-            # patch_indices = self.resize_indices(patch_indices)
-            return resized_patch_indices
-
-    # def resize_indices(self, patch_indices):
-    #     patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int64)
-    #     return patch_indices
-
-    def __len__(self):
-        return len(self.sampler)
-
-
-class ChunkedResizeSampler(Dataset):
-    def __init__(self, sampler, target_size, image_size=None, patch_size=None, patch_overlap=None, chunk_size=None, mode='edge'):
-        self.sampler = sampler
-        self.target_size = target_size
-        self.mode = mode
-        # self.size_conversion_factor = size_conversion_factor
-        # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
-        # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
-        self.resized_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size,
-                                                   patch_overlap=patch_overlap, chunk_size=chunk_size)
-        self.sanity_check()
-
-    def sanity_check(self):
-        if self.sampler.length[-1] != self.resized_sampler.length[-1]:
-            raise RuntimeError("Lengths of sampler ({}) and resized_sampler ({}) do not match.".format(self.sampler.length[-1], self.resized_sampler.length[-1]))
-
-    def __getitem__(self, idx):
-        output = self.sampler.__getitem__(idx)
-        resized_patch_indices = self.resized_sampler.__getitem__(idx)[0]
-        if len(output) == 2 and not isinstance(output[0], dict):
-            patch, (patch_indices, chunk_id) = output
-            patch = ski_transform.resize(patch, output_shape=self.target_size, order=1, mode=self.mode)
-            # patch_indices = self.resize_indices(patch_indices)
-            return patch, (resized_patch_indices, chunk_id)
-        elif len(output) == 2 and isinstance(output[0], dict):
-            patch_dict, (patch_indices, chunk_id) = output
-            for key in patch_dict.keys():
-                patch_dict[key] = ski_transform.resize(patch_dict[key], output_shape=self.target_size, order=1, mode=self.mode)
-            # patch_indices = self.resize_indices(patch_indices)
-            return patch_dict, (resized_patch_indices, chunk_id)
-        else:
-            (patch_indices, chunk_id) = output
-            # patch_indices = self.resize_indices(patch_indices)
-            return (resized_patch_indices, chunk_id)
-
-    # def resize_indices(self, patch_indices):
-    #     patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int64)
-    #     return patch_indices
-
-    def __len__(self):
-        return len(self.sampler)
+# class ResizeSampler(Dataset):
+#     def __init__(self, sampler, target_size, image_size=None, patch_size=None, patch_overlap=None, mode='edge'):
+#         self.sampler = sampler
+#         self.target_size = target_size
+#         self.mode = mode
+#         # self.size_conversion_factor = size_conversion_factor
+#         # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
+#         # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
+#         self.resized_sampler = _EdgeGridSampler(spatial_size=image_size, patch_size=patch_size,
+#                                                 patch_overlap=patch_overlap)
+#         self.sanity_check()
+#
+#     def sanity_check(self):
+#         if len(self.sampler) != len(self.resized_sampler):
+#             raise RuntimeError("Lengths of sampler ({}) and resized_sampler ({}) do not match.".format(self.sampler.cumsum_length[-1], self.resized_sampler.length[-1]))
+#
+#     def __getitem__(self, idx):
+#         output = self.sampler.__getitem__(idx)
+#         resized_patch_indices = self.resized_sampler.__getitem__(idx)
+#         if len(output) == 2 and not isinstance(output[0], dict):
+#             patch, patch_indices = output
+#             patch = ski_transform.resize(patch, output_shape=self.target_size, order=1, mode=self.mode)
+#             # patch_indices = self.resize_indices(patch_indices)
+#             return patch, resized_patch_indices
+#         elif len(output) == 2 and isinstance(output[0], dict):
+#             patch_dict, patch_indices = output
+#             for key in patch_dict.keys():
+#                 patch_dict[key] = ski_transform.resize(patch_dict[key], output_shape=self.target_size, order=1, mode=self.mode)
+#             # patch_indices = self.resize_indices(patch_indices)
+#             return patch_dict, resized_patch_indices
+#         else:
+#             patch_indices = output
+#             # patch_indices = self.resize_indices(patch_indices)
+#             return resized_patch_indices
+#
+#     # def resize_indices(self, patch_indices):
+#     #     patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int64)
+#     #     return patch_indices
+#
+#     def __len__(self):
+#         return len(self.sampler)
+#
+#
+# class ChunkedResizeSampler(Dataset):
+#     def __init__(self, sampler, target_size, image_size=None, patch_size=None, patch_overlap=None, chunk_size=None, mode='edge'):
+#         self.sampler = sampler
+#         self.target_size = target_size
+#         self.mode = mode
+#         # self.size_conversion_factor = size_conversion_factor
+#         # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
+#         # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
+#         self.resized_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size,
+#                                                    patch_overlap=patch_overlap, chunk_size=chunk_size)
+#         self.sanity_check()
+#
+#     def sanity_check(self):
+#         if self.sampler.cumsum_length[-1] != self.resized_sampler.cumsum_length[-1]:
+#             raise RuntimeError("Lengths of sampler ({}) and resized_sampler ({}) do not match.".format(self.sampler.cumsum_length[-1], self.resized_sampler.cumsum_length[-1]))
+#
+#     def __getitem__(self, idx):
+#         output = self.sampler.__getitem__(idx)
+#         resized_patch_indices = self.resized_sampler.__getitem__(idx)[0]
+#         if len(output) == 2 and not isinstance(output[0], dict):
+#             patch, (patch_indices, chunk_id) = output
+#             patch = ski_transform.resize(patch, output_shape=self.target_size, order=1, mode=self.mode)
+#             # patch_indices = self.resize_indices(patch_indices)
+#             return patch, (resized_patch_indices, chunk_id)
+#         elif len(output) == 2 and isinstance(output[0], dict):
+#             patch_dict, (patch_indices, chunk_id) = output
+#             for key in patch_dict.keys():
+#                 patch_dict[key] = ski_transform.resize(patch_dict[key], output_shape=self.target_size, order=1, mode=self.mode)
+#             # patch_indices = self.resize_indices(patch_indices)
+#             return patch_dict, (resized_patch_indices, chunk_id)
+#         else:
+#             (patch_indices, chunk_id) = output
+#             # patch_indices = self.resize_indices(patch_indices)
+#             return (resized_patch_indices, chunk_id)
+#
+#     # def resize_indices(self, patch_indices):
+#     #     patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int64)
+#     #     return patch_indices
+#
+#     def __len__(self):
+#         return len(self.sampler)
 
 
-class SamplerDataset(Dataset):
-    def __init__(self, sampler):
-        self.sampler = sampler
-
-    def __getitem__(self, idx):
-        output = self.sampler.__getitem__(idx)
-        if len(output) == 2 and not isinstance(output[0], dict):
-            patch, patch_indices = output
-            patch = patch[np.newaxis, ...].astype(np.float32)
-            return patch, patch_indices
-        elif len(output) == 2 and isinstance(output[0], dict):
-            patch_dict, patch_indices = output
-            for key in patch_dict.keys():
-                patch_dict[key] = patch_dict[key][np.newaxis, ...].astype(np.float32)
-            return patch_dict, patch_indices
-        else:
-            return output
-
-    def __len__(self):
-        return len(self.sampler)
+# class SamplerDataset(Dataset):
+#     def __init__(self, sampler):
+#         self.sampler = sampler
+#
+#     def __getitem__(self, idx):
+#         output = self.sampler.__getitem__(idx)
+#         if len(output) == 2 and not isinstance(output[0], dict):
+#             patch, patch_indices = output
+#             patch = patch[np.newaxis, ...].astype(np.float32)
+#             return patch, patch_indices
+#         elif len(output) == 2 and isinstance(output[0], dict):
+#             patch_dict, patch_indices = output
+#             for key in patch_dict.keys():
+#                 patch_dict[key] = patch_dict[key][np.newaxis, ...].astype(np.float32)
+#             return patch_dict, patch_indices
+#         else:
+#             return output
+#
+#     def __len__(self):
+#         return len(self.sampler)
 
 
 # class GridSamplerDataset(GridSampler, Dataset):

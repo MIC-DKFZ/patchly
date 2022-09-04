@@ -184,13 +184,13 @@ class _BasicGridSampler:
             return patch_indices
 
     def get_slices(self, image, patch_indices):
-        non_image_dims = len(image.shape) - len(self.spatial_size)
+        non_spatial_dims = len(image.shape) - len(self.spatial_size)
         if self.spatial_first:
-            slices = [None] * non_image_dims
+            slices = [None] * non_spatial_dims
             slices.extend([index_pair.tolist() for index_pair in patch_indices])
         else:
             slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([None] * non_image_dims)
+            slices.extend([None] * non_spatial_dims)
         return slices
 
 
@@ -549,13 +549,13 @@ class UniformSampler:
             raise StopIteration
 
     def get_slices(self, image, patch_indices):
-        non_image_dims = len(image.shape) - self.spatial_dims
+        non_spatial_dims = len(image.shape) - self.spatial_dims
         if self.channel_first:
-            slices = [None] * non_image_dims
+            slices = [None] * non_spatial_dims
             slices.extend([index_pair.tolist() for index_pair in patch_indices])
         else:
             slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([None] * non_image_dims)
+            slices.extend([None] * non_spatial_dims)
         return slices
 
     def random_position(self, patch_size, image_shape):

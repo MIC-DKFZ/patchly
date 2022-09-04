@@ -13,27 +13,27 @@ class GridSampler:
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Optional[Union[Tuple, npt.ArrayLike]] = None,
                  chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = "sample_edge"):
         """
-                TODO
-                If no image is given then only patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
+        TODO description
+        If no image is given then only patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
 
-                :param image: The image in an array-like format (Numpy, Samplify.Subject, Zarr, Dask, ...) that can be memory-mapped.
-                Samplify.subject is directly supported and will sample the same patch from all stored images.
-                The image can have an arbitrary number of additional non-spatial dimensions.
-                :param spatial_size: The spatial shape of the image. The spatial shape excludes the channel, batch and any other non-spatial dimensionality.
-                :param patch_size: The spatial shape of the patch. The patch shape excludes the channel, batch and any other non-spatial dimensionality.
-                :param patch_overlap: The spatial shape of the patch overlap. If None then the patch overlap is equal to the patch size.
-                The patch overlap excludes the channel, batch and any other non-spatial dimensionality.
-                :param chunk_size: The spatial shape of the chunk size. If given, the image is divided into chunks and patches are sampled from a single chunk until the chunk is depleted.
-                This enables patch sampling of larger-than-RAM images in combination with memory-mapped arrays. The chunk size is required to be a multiple of the patch size.
-                The chunk size excludes the channel, batch and any other non-spatial dimensionality. An in-depth explanation of chunked sampling can be found here: LINK
-                :param spatial_first: Denotes that the spatial dimensions of the image are located before the non-spatial dimensions e.g. (Width, Height, Channel).
-                Otherwise, the reverse is true e.g. (Channel, Width, Height).
-                :param mode: TODO
-                """
+        :param image: The image in an array-like format (Numpy, Samplify.Subject, Zarr, Dask, ...) that can be memory-mapped.
+        Samplify.subject is directly supported and will sample the same patch from all stored images.
+        The image can have an arbitrary number of additional non-spatial dimensions.
+        :param spatial_size: The spatial shape of the image. The spatial shape excludes the channel, batch and any other non-spatial dimensionality.
+        :param patch_size: The spatial shape of the patch. The patch shape excludes the channel, batch and any other non-spatial dimensionality.
+        :param patch_overlap: The spatial shape of the patch overlap. If None then the patch overlap is equal to the patch size.
+        The patch overlap excludes the channel, batch and any other non-spatial dimensionality.
+        :param chunk_size: The spatial shape of the chunk size. If given, the image is divided into chunks and patches are sampled from a single chunk until the chunk is depleted.
+        This enables patch sampling of larger-than-RAM images in combination with memory-mapped arrays. The chunk size is required to be a multiple of the patch size.
+        The chunk size excludes the channel, batch and any other non-spatial dimensionality. An in-depth explanation of chunked sampling can be found here: LINK
+        :param spatial_first: Denotes that the spatial dimensions of the image are located before the non-spatial dimensions e.g. (Width, Height, Channel).
+        Otherwise, the reverse is true e.g. (Channel, Width, Height).
+        :param mode: TODO
+        """
         self.image = image
         self.spatial_size = self.set_parameter(spatial_size)
         self.patch_size = self.set_parameter(patch_size)
-        self.patch_overlap = self.set_parameter(patch_overlap)
+        self.patch_overlap = self.set_patch_overlap(patch_overlap, patch_size)
         self.chunk_size = self.set_parameter(chunk_size)
         self.spatial_first = spatial_first
         self.mode = mode
@@ -47,18 +47,25 @@ class GridSampler:
             parameter = np.asarray(parameter)
         return parameter
 
+    def set_patch_overlap(self, patch_overlap, patch_size):
+        if patch_overlap is None:
+            patch_overlap = patch_size
+        else:
+            patch_overlap = np.asarray(patch_overlap)
+        return patch_overlap
+
     def create_sampler(self):
         if self.mode == "sample_edge" and self.chunk_size is None:
-            sampler = _GridSampler(image=self.image, image_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, channel_first=not self.spatial_first)
+            sampler = _EdgeGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
         elif self.mode == "sample_edge" and self.chunk_size is not None:
-            sampler = _ChunkedGridSampler(image=self.image, image_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
-                                          channel_first=not self.spatial_first)
+            sampler = _ChunkedGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
+                                          spatial_first=not self.spatial_first)
         elif self.mode == "sample_adaptive" and self.chunk_size is None:
-            sampler = _AdaptiveGridSampler(image=self.image, image_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, channel_first=not self.spatial_first)
+            sampler = _AdaptiveGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
         elif self.mode == "sample_adaptive" and self.chunk_size is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         elif self.mode == "sample_crop" and self.chunk_size is None:
-            sampler = _BasicGridSampler(image=self.image, image_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, channel_first=not self.spatial_first)
+            sampler = _BasicGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
         elif self.mode == "sample_crop" and self.chunk_size is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         elif self.mode.startswith('pad_') and self.chunk_size is None:
@@ -106,8 +113,10 @@ class GridSampler:
 
 
 class _BasicGridSampler:
-    def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, channel_first=True):
+    def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
         """
+        TODO Redo doc
+
         An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have overlap if patch_overlap is specified.
         If patch_size is not a multiple of image_size then the remainder part of the image is not sampled.
         The grid sampler only returns image patches if image is set.
@@ -117,44 +126,21 @@ class _BasicGridSampler:
 
         :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
         If None then patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
-        :param image_size: The shape of the image without batch and channel dimensions. Always required.
+        :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param patch_overlap: The shape of the patch overlap without batch and channel dimensions. If None then the patch overlap is equal to patch_size.
         """
         self.image = image
-        self.image_size = image_size
-        self.channel_first = channel_first
-        self.set_patch_size(patch_size)
-        self.set_patch_overlap(patch_overlap)
-        self.check_sanity()
+        self.spatial_size = spatial_size
+        self.spatial_first = spatial_first
+        self.patch_size = patch_size
+        self.patch_overlap = patch_overlap
         self.indices = self.compute_indices()
         self.length = len(self.indices)
 
-    def set_patch_size(self, patch_size):
-        if patch_size is not None:
-            self.patch_size = np.asarray(patch_size)
-        else:
-            raise RuntimeError("patch_size must be given.")
-
-    def set_patch_overlap(self, patch_overlap):
-        if patch_overlap is None:
-            self.patch_overlap = self.patch_size
-        else:
-            self.patch_overlap = np.asarray(patch_overlap)
-
-    def check_sanity(self):
-        if self.image_size is None:
-            raise RuntimeError("image_size must be given.")
-        if np.any(self.patch_size > self.image_size):
-            raise RuntimeError("patch_size is larger than image_size for at least one axis, which is not allowed.")
-        if np.any(self.patch_overlap > self.patch_size):
-            raise RuntimeError("patch_overlap is larger than patch_size for at least one axis, which is not allowed.")
-        if len(self.image_size) != len(self.patch_size) or len(self.patch_size) != len(self.patch_overlap):
-            raise RuntimeError("image_size, patch_size and patch_overlap are required to have the same dimensionality.")
-
     def compute_indices(self):
-        n_axis = len(self.image_size)
-        stop = [self.image_size[axis] - self.patch_size[axis] + 1 for axis in range(n_axis)]
+        n_axis = len(self.spatial_size)
+        stop = [self.spatial_size[axis] - self.patch_size[axis] + 1 for axis in range(n_axis)]
         axis_indices = [np.arange(0, stop[axis], self.patch_overlap[axis]) for axis in range(n_axis)]
         axis_indices = np.meshgrid(*axis_indices, indexing='ij')
         indices = np.column_stack([axis_indices[axis].ravel() for axis in range(n_axis)])
@@ -195,8 +181,8 @@ class _BasicGridSampler:
             raise StopIteration
 
     def get_slices(self, image, patch_indices):
-        non_image_dims = len(image.shape) - len(self.image_size)
-        if self.channel_first:
+        non_image_dims = len(image.shape) - len(self.spatial_size)
+        if self.spatial_first:
             slices = [None] * non_image_dims
             slices.extend([index_pair.tolist() for index_pair in patch_indices])
         else:
@@ -205,9 +191,11 @@ class _BasicGridSampler:
         return slices
 
 
-class _GridSampler(_BasicGridSampler):
-    def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, channel_first=True):
+class _EdgeGridSampler(_BasicGridSampler):
+    def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
         """
+        TODO Redo doc
+
         An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have overlap if patch_overlap is specified.
         If patch_size is not a multiple of image_size then the remainder part of the image is not padded, but instead patches are sampled at the edge of the image of size patch_size like this:
         ----------------------
@@ -225,19 +213,19 @@ class _GridSampler(_BasicGridSampler):
 
         :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
         If None then patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
-        :param image_size: The shape of the image without batch and channel dimensions. Always required.
+        :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param patch_overlap: The shape of the patch overlap without batch and channel dimensions. If None then the patch overlap is equal to patch_size.
         """
-        super().__init__(image, image_size, patch_size, patch_overlap, channel_first=channel_first)
+        super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)
 
     def compute_indices(self):
-        n_axis = len(self.image_size)
-        stop = [self.image_size[axis] - self.patch_size[axis] + 1 for axis in range(n_axis)]
+        n_axis = len(self.spatial_size)
+        stop = [self.spatial_size[axis] - self.patch_size[axis] + 1 for axis in range(n_axis)]
         axis_indices = [np.arange(0, stop[axis], self.patch_overlap[axis]) for axis in range(n_axis)]
         for axis in range(n_axis):
-            if axis_indices[axis][-1] != self.image_size[axis] - self.patch_size[axis]:
-                axis_indices[axis] = np.append(axis_indices[axis], [self.image_size[axis] - self.patch_size[axis]],
+            if axis_indices[axis][-1] != self.spatial_size[axis] - self.patch_size[axis]:
+                axis_indices[axis] = np.append(axis_indices[axis], [self.spatial_size[axis] - self.patch_size[axis]],
                                                axis=0)
         axis_indices = np.meshgrid(*axis_indices, indexing='ij')
         indices = np.column_stack([axis_indices[axis].ravel() for axis in range(n_axis)])
@@ -245,13 +233,14 @@ class _GridSampler(_BasicGridSampler):
 
 
 class _AdaptiveGridSampler(_BasicGridSampler):
-    def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, min_overlap=None, channel_first=True):
-        self.min_overlap = min_overlap
-        super().__init__(image, image_size, patch_size, patch_overlap, channel_first=channel_first)
+    def __init__(self, spatial_size, patch_size, patch_overlap=None, image=None, spatial_first=True):
+        # TODO: When used in ChunkedGridSampler the adaptive patches should have a minimum size of patch size
+        # TODO: Do doc
+        super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)
 
     def compute_indices(self):
-        n_axis = len(self.image_size)
-        stop = [self.image_size[axis] for axis in range(n_axis)]
+        n_axis = len(self.spatial_size)
+        stop = [self.spatial_size[axis] for axis in range(n_axis)]
         axis_indices = [np.arange(0, stop[axis], self.patch_overlap[axis]) for axis in range(n_axis)]
         axis_indices = np.meshgrid(*axis_indices, indexing='ij')
         indices = np.column_stack([axis_indices[axis].ravel() for axis in range(n_axis)])
@@ -262,7 +251,7 @@ class _AdaptiveGridSampler(_BasicGridSampler):
         patch_indices = np.zeros(len(indices) * 2, dtype=int).reshape(-1, 2)
         for axis in range(len(indices)):
             patch_indices[axis][0] = indices[axis]
-            patch_indices[axis][1] = min(indices[axis] + self.patch_size[axis], self.image_size[axis])
+            patch_indices[axis][1] = min(indices[axis] + self.patch_size[axis], self.spatial_size[axis])
         if self.image is not None and not isinstance(self.image, dict):
             slices = self.get_slices(self.image, patch_indices)
             patch = self.image[slicer(self.image, slices)]
@@ -278,52 +267,21 @@ class _AdaptiveGridSampler(_BasicGridSampler):
 
 
 class _ChunkedGridSampler:
-    def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, chunk_size=None, channel_first=True):
+    def __init__(self, spatial_size, patch_size, chunk_size, patch_overlap=None, image=None, spatial_first=True):
         self.image = image
-        self.image_size = np.asarray(image_size)
-        self.set_patch_size(patch_size)
-        self.set_patch_overlap(patch_overlap)
-        self.set_chunk_size(chunk_size)
-        self.channel_first = channel_first
-        self.check_sanity()
+        self.spatial_size = spatial_size
+        self.patch_size = patch_size
+        self.patch_overlap = patch_overlap
+        self.chunk_size = chunk_size
+        self.spatial_first = spatial_first
 
         self.compute_indices()
         self.compute_length()
         self.chunk_index = 0
         self.patch_index = 0
 
-    def set_patch_size(self, patch_size):
-        if patch_size is not None:
-            self.patch_size = np.asarray(patch_size)
-        else:
-            raise RuntimeError("patch_size must be given.")
-
-    def set_patch_overlap(self, patch_overlap):
-        if patch_overlap is None:
-            self.patch_overlap = self.patch_size
-        else:
-            self.patch_overlap = np.asarray(patch_overlap)
-
-    def set_chunk_size(self, chunk_size):
-        if chunk_size is not None:
-            self.chunk_size = np.asarray(chunk_size)
-        else:
-            raise RuntimeError("chunk_size must be given.")
-
-    def check_sanity(self):
-        if self.image_size is None:
-            raise RuntimeError("image_size must be given.")
-        if np.any(self.patch_size > self.image_size):
-            raise RuntimeError("patch_size is larger than image_size for at least one axis, which is not allowed.")
-        if np.any(self.patch_overlap > self.patch_size):
-            raise RuntimeError("patch_overlap is larger than patch_size for at least one axis, which is not allowed.")
-        if len(self.image_size) != len(self.patch_size) or len(self.patch_size) != len(self.patch_overlap):
-            raise RuntimeError("image_size, patch_size and patch_overlap are required to have the same dimensionality.")
-        if (self.chunk_size % self.patch_size != 0).any() or np.any(self.patch_size >= self.chunk_size):
-            raise RuntimeError("Chunk size needs to be larger and a multiple of patch size.")
-
     def compute_indices(self):
-        self.grid_sampler = _GridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
+        self.grid_sampler = _EdgeGridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size)
         # TODO: Check if ChunkGridSampler still works with this
         # self.grid_sampler = AdaptiveGridSampler(image_size=self.image_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, min_overlap=self.patch_size)
         self.chunk_sampler = []
@@ -333,7 +291,7 @@ class _ChunkedGridSampler:
             chunk_indices = chunk_indices.reshape(-1, 2)
             chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
             self.chunk_sampler.append(
-                _GridSampler(image_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))  # TODO: Replace with BasicGridSampler???
+                _EdgeGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))  # TODO: Replace with BasicGridSampler???
             self.chunk_sampler_offset.append(copy.copy(chunk_indices[:, 0]))
 
     def compute_length(self):
@@ -380,8 +338,8 @@ class _ChunkedGridSampler:
             raise StopIteration
 
     def get_slices(self, image, patch_indices):
-        non_image_dims = len(image.shape) - len(self.image_size)
-        if self.channel_first:
+        non_image_dims = len(image.shape) - len(self.spatial_size)
+        if self.spatial_first:
             slices = [None] * non_image_dims
             slices.extend([index_pair.tolist() for index_pair in patch_indices])
         else:
@@ -398,8 +356,8 @@ class ResizeSampler(Dataset):
         # self.size_conversion_factor = size_conversion_factor
         # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
         # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
-        self.resized_sampler = _GridSampler(image_size=image_size, patch_size=patch_size,
-                                            patch_overlap=patch_overlap)
+        self.resized_sampler = _EdgeGridSampler(spatial_size=image_size, patch_size=patch_size,
+                                                patch_overlap=patch_overlap)
         self.sanity_check()
 
     def sanity_check(self):
@@ -441,7 +399,7 @@ class ChunkedResizeSampler(Dataset):
         # self.size_conversion_factor = size_conversion_factor
         # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
         # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
-        self.resized_sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size,
+        self.resized_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size,
                                                    patch_overlap=patch_overlap, chunk_size=chunk_size)
         self.sanity_check()
 
@@ -673,7 +631,7 @@ if __name__ == '__main__':
     patch_size = (20,)
     patch_overlap = (10,)
     chunk_size = (60,)
-    grid_sampler = _ChunkedGridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap,
+    grid_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap,
                                        chunk_size=chunk_size)
 
     # image_size = (299,)  # (2010, 450, 2010)

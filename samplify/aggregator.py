@@ -116,7 +116,7 @@ class Aggregator:
         return slices
 
 
-class ChunkedWeightedSoftmaxAggregator(Aggregator):
+class ChunkAggregator(Aggregator):
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Union[Tuple, npt.ArrayLike], chunk_size: Union[Tuple, npt.ArrayLike],
                  output_size: Union[Tuple, npt.ArrayLike] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True,
                  softmax_dim: Optional[int] = None, mode: str = 'sample_edge'):
@@ -240,7 +240,7 @@ class ChunkedWeightedSoftmaxAggregator(Aggregator):
         return self.output
 
 
-class ResizeChunkedWeightedSoftmaxAggregator(ChunkedWeightedSoftmaxAggregator):
+class ResizeChunkedWeightedSoftmaxAggregator(ChunkAggregator):
     def __init__(self, output=None, spatial_size=None, patch_size=None, patch_overlap=None, chunk_size=None, weights='gaussian', spacing=None):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
@@ -309,7 +309,7 @@ class ResizeChunkedWeightedSoftmaxAggregator(ChunkedWeightedSoftmaxAggregator):
 
 
 if __name__ == '__main__':
-    from sampler import _ChunkedGridSampler
+    from sampler import _ChunkGridSampler
     import zarr
     from tqdm import tqdm
 
@@ -323,8 +323,8 @@ if __name__ == '__main__':
     # result = np.zeros(image_size, dtype=np.uint8)
     result = zarr.open("tmp.zarr", mode='w', shape=image_size, chunks=chunk_size, dtype=np.uint8)
 
-    grid_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
-    aggregrator = ChunkedWeightedSoftmaxAggregator(output=result, spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+    grid_sampler = _ChunkGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+    aggregrator = ChunkAggregator(output=result, spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
     print(len(grid_sampler))
 

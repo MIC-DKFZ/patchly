@@ -58,8 +58,8 @@ class GridSampler:
         if self.mode == "sample_edge" and self.chunk_size is None:
             sampler = _EdgeGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
         elif self.mode == "sample_edge" and self.chunk_size is not None:
-            sampler = _ChunkedGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
-                                          spatial_first=not self.spatial_first)
+            sampler = _ChunkGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
+                                        spatial_first=not self.spatial_first)
         elif self.mode == "sample_adaptive" and self.chunk_size is None:
             sampler = _AdaptiveGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
         elif self.mode == "sample_adaptive" and self.chunk_size is not None:
@@ -260,7 +260,7 @@ class _AdaptiveGridSampler(_CropGridSampler):
         return slice_result
 
 
-class _ChunkedGridSampler(_CropGridSampler):
+class _ChunkGridSampler(_CropGridSampler):
     def __init__(self, spatial_size: np.ndarray, patch_size: np.ndarray, chunk_size: np.ndarray, patch_overlap: np.ndarray, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = 'sample_edge'):
         self.chunk_size = chunk_size
         self.mode = mode
@@ -592,8 +592,8 @@ if __name__ == '__main__':
     patch_size = (20,)
     patch_overlap = (10,)
     chunk_size = (60,)
-    grid_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap,
-                                       chunk_size=chunk_size)
+    grid_sampler = _ChunkGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap,
+                                     chunk_size=chunk_size)
 
     # image_size = (299,)  # (2010, 450, 2010)
     # patch_size = (50,)

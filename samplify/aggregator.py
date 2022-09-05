@@ -10,6 +10,34 @@ import numpy.typing as npt
 
 
 class Aggregator:
+    def __init__(self, sampler: GridSampler, output_size: Union[Tuple, npt.ArrayLike] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None):
+        self.aggregator = self.set_aggregator(sampler, output_size, output, weights, softmax_dim)
+
+    def set_aggregator(self, sampler, output_size, output, weights, softmax_dim):
+        mode = sampler.mode
+        chunk_size = sampler.chunk_size
+        if mode.startswith('sample_') and chunk_size is None:
+            sampler = _Aggregator(spatial_size=sampler.spatial_size, patch_size=sampler.patch_size, output_size=output_size,
+                                  output=output, weights=weights, spatial_first=sampler.spatial_first, softmax_dim=softmax_dim)
+        elif mode.startswith('sample_') and chunk_size is not None:
+            sampler = _ChunkAggregator(spatial_size=sampler.spatial_size, patch_size=sampler.patch_size, patch_overlap=sampler.patch_overlap, chunk_size=sampler.chunk_size,
+                                       output_size=output_size, output=output, weights=weights, spatial_first=sampler.spatial_first, softmax_dim=softmax_dim)
+        elif mode.startswith('pad_') and chunk_size is None:
+            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(mode))
+        elif mode.startswith('pad_') and chunk_size is not None:
+            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(mode))
+        else:
+            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(mode))
+        return sampler
+
+    def append(self, patch, patch_indices):
+        self.aggregator.append(patch, patch_indices)
+
+    def get_output(self, inplace: bool = False):
+        return self.aggregator.get_output(inplace)
+
+
+class _Aggregator:
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], output_size: Union[Tuple, npt.ArrayLike] = None,
                  output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True, softmax_dim: Optional[int] = None):
         """
@@ -116,7 +144,7 @@ class Aggregator:
         return slices
 
 
-class ChunkAggregator(Aggregator):
+class _ChunkAggregator(_Aggregator):
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Union[Tuple, npt.ArrayLike], chunk_size: Union[Tuple, npt.ArrayLike],
                  output_size: Union[Tuple, npt.ArrayLike] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True,
                  softmax_dim: Optional[int] = None, mode: str = 'sample_edge'):
@@ -240,7 +268,7 @@ class ChunkAggregator(Aggregator):
         return self.output
 
 
-class ResizeChunkedWeightedSoftmaxAggregator(ChunkAggregator):
+class ResizeChunkedWeightedSoftmaxAggregator(_ChunkAggregator):
     def __init__(self, output=None, spatial_size=None, patch_size=None, patch_overlap=None, chunk_size=None, weights='gaussian', spacing=None):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
@@ -324,7 +352,7 @@ if __name__ == '__main__':
     result = zarr.open("tmp.zarr", mode='w', shape=image_size, chunks=chunk_size, dtype=np.uint8)
 
     grid_sampler = _ChunkGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
-    aggregrator = ChunkAggregator(output=result, spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
+    aggregrator = _ChunkAggregator(output=result, spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size)
 
     print(len(grid_sampler))
 

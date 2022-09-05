@@ -25,7 +25,7 @@ class Aggregator:
         self.patch_size = np.asarray(patch_size)
         self.output = self.set_output(output, output_size)
         self.spatial_first = spatial_first
-        self.weight_map = np.zeros(self.spatial_size, dtype=np.uint16)
+        self.weight_map = np.zeros(self.spatial_size, dtype=np.float32)
         self.weight_patch = self.set_weight_patch(weights)
         self.computed_inplace = False
         self.softmax_dim = softmax_dim

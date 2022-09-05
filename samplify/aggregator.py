@@ -118,7 +118,8 @@ class Aggregator:
 
 class ChunkedWeightedSoftmaxAggregator(Aggregator):
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Union[Tuple, npt.ArrayLike], chunk_size: Union[Tuple, npt.ArrayLike],
-                 output_size: Union[Tuple, npt.ArrayLike] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True, softmax_dim: Optional[int] = None, mode: str = 'sample_edge'):
+                 output_size: Union[Tuple, npt.ArrayLike] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True,
+                 softmax_dim: Optional[int] = None, mode: str = 'sample_edge'):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
@@ -179,7 +180,8 @@ class ChunkedWeightedSoftmaxAggregator(Aggregator):
         patch_indices_key = patch_indices.astype(np.int64).tobytes()
         if patch_indices_key not in self.chunk_patches_dicts[chunk_id]:
             unhashed_keys = [np.array(np.frombuffer(key, dtype=np.int64), dtype=int).reshape(-1, 2) for key in self.chunk_patches_dicts[chunk_id].keys()]
-            raise RuntimeError("patch_indices_key not in self.chunk_patches_dicts[chunk_id]! patch_indices: {}. Offset for chunk_id {} is{}. unhashed_keys: {}".format( patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], unhashed_keys))
+            raise RuntimeError("patch_indices_key not in self.chunk_patches_dicts[chunk_id]! patch_indices: {}. Offset for chunk_id {} is{}. unhashed_keys: {}".format(
+                patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], unhashed_keys))
         self.chunk_patches_dicts[chunk_id][patch_indices_key] = patch
         if self.is_chunk_complete(chunk_id):
             # print("chunk_id: ", chunk_id)

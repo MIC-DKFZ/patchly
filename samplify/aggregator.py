@@ -132,9 +132,16 @@ class ChunkedWeightedSoftmaxAggregator(Aggregator):
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, output_size=output_size, output=output, weights=weights, spatial_first=spatial_first, softmax_dim=softmax_dim)
         self.patch_overlap = patch_overlap
         self.chunk_size = chunk_size
+        self.chunk_dtype = self.set_chunk_dtype()
         self.mode = mode
         self.compute_indices()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+
+    def set_chunk_dtype(self):
+        if self.softmax_dim is None:
+            return self.output.dtype
+        else:
+            return np.float32
 
     def compute_indices(self):
         self.grid_sampler = GridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, mode=self.mode)
@@ -187,36 +194,47 @@ class ChunkedWeightedSoftmaxAggregator(Aggregator):
         return True
 
     def process_chunk(self, chunk_id):
-        # print("Test", flush=True)
         # If they are all not None, create a softmax array of size chunk_size with number classes as channels
-        num_channels = self.chunk_patches_dicts[chunk_id][list(self.chunk_patches_dicts[chunk_id].keys())[0]].shape[0]
-        output_chunk_softmax = np.zeros((num_channels, *self.chunk_size), dtype=np.float32)
+        patch_shape = self.chunk_patches_dicts[chunk_id][list(self.chunk_patches_dicts[chunk_id].keys())[0]].shape
+        chunk_size = self.add_non_spatial_chunk_dims(self.chunk_size, patch_shape)
+        chunk = np.zeros(chunk_size, dtype=self.chunk_dtype)
         # Weight each patch during insertion
         sampler_offset = self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
         for patch_indices_key, patch in self.chunk_patches_dicts[chunk_id].items():
             patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
             patch_indices -= sampler_offset
-            slices = self.add_non_spatial_dims(output_chunk_softmax, patch_indices)
-            output_chunk_softmax[slicer(output_chunk_softmax, slices)] += patch.astype(output_chunk_softmax.dtype) * self.weight_patch.astype(output_chunk_softmax.dtype)
-        if self.argmax:
+            slices = self.add_non_spatial_dims(chunk, patch_indices)
+            chunk[slicer(chunk, slices)] += patch.astype(chunk.dtype) * self.weight_patch.astype(chunk.dtype)
+        if self.softmax_dim is not None:
             # Argmax the softmax chunk
-            output_chunk = output_chunk_softmax.argmax(axis=0).astype(np.uint16)
-        else:
-            output_chunk = output_chunk_softmax
+            chunk = chunk.argmax(axis=self.softmax_dim).astype(np.uint16)
         # Crop the chunk
         crop_indices = self.chunk_indices[chunk_id] - sampler_offset
-        crop_indices = self.add_non_spatial_dims(output_chunk, crop_indices)
-        output_chunk = output_chunk[slicer(output_chunk, crop_indices)]
+        crop_indices = self.add_non_spatial_dims(chunk, crop_indices)
+        chunk = chunk[slicer(chunk, crop_indices)]
         # Write the chunk into the global output
         crop_indices = self.chunk_indices[chunk_id]
         crop_indices = self.add_non_spatial_dims(self.output, crop_indices)
-        self.output[slicer(self.output, crop_indices)] = output_chunk
+        self.output[slicer(self.output, crop_indices)] = chunk
         # Set all self.chunk_patches_dicts[chunk_id] values to None
         for key in self.chunk_patches_dicts[chunk_id].keys():
             self.chunk_patches_dicts[chunk_id][key] = None
         # print("Finished saving chunk ", chunk_id, flush=True)
 
-    def get_output(self, inplace=False):
+    def add_non_spatial_chunk_dims(self, spatial_chunk_size, patch_shape):
+        non_spatial_dims = len(patch_shape) - len(self.spatial_size)
+        if non_spatial_dims > 0 and self.spatial_first:
+            non_spatial_dims = patch_shape[self.spatial_size:]
+            chunk_size = (*spatial_chunk_size, *non_spatial_dims)
+            return chunk_size
+        elif non_spatial_dims > 0:
+            non_spatial_dims = patch_shape[:self.spatial_size]
+            chunk_size = (*non_spatial_dims, *spatial_chunk_size)
+            return chunk_size
+        else:
+            return spatial_chunk_size
+
+    def get_output(self, inplace: bool = False):
         return self.output
 
 

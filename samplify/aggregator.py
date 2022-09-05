@@ -48,7 +48,7 @@ class Aggregator:
 
     def set_weight_patch(self, weights):
         if weights == 'avg':
-            weight_patch = np.ones(patch.shape, dtype=np.uint8)
+            weight_patch = np.ones(self.patch_size, dtype=np.uint8)
         elif weights == 'gaussian':
             weight_patch = self.create_gaussian_weights(self.patch_size)
         elif callable(weights):

@@ -359,7 +359,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, spatial_first=spatial_first, mode="sample_adaptive")
 
         for patch, patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
             np.testing.assert_array_equal(patch, image[slicer(image, slices)], err_msg="image shape: {}, patch shape: {}, patch indices: {}, slices: {}".format(image.shape, patch.shape, patch_indices, slices))
 
@@ -372,7 +372,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, mode="sample_adaptive")
 
         for patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
@@ -390,7 +390,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, spatial_first=spatial_first, mode="sample_adaptive")
 
         for patch, patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
             np.testing.assert_array_equal(patch, image[slicer(image, slices)], err_msg="image shape: {}, patch shape: {}, patch indices: {}, slices: {}".format(image.shape, patch.shape, patch_indices, slices))
 
@@ -403,7 +403,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, mode="sample_adaptive")
 
         for patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
@@ -421,7 +421,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, spatial_first=spatial_first, mode="sample_adaptive")
 
         for patch, patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
             np.testing.assert_array_equal(patch, image[slicer(image, slices)], err_msg="image shape: {}, patch shape: {}, patch indices: {}, slices: {}".format(image.shape, patch.shape, patch_indices, slices))
 
@@ -434,7 +434,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, mode="sample_adaptive")
 
         for patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
@@ -452,7 +452,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, spatial_first=spatial_first, mode="sample_adaptive")
 
         for patch, patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
             np.testing.assert_array_equal(patch, image[slicer(image, slices)], err_msg="image shape: {}, patch shape: {}, patch indices: {}, slices: {}".format(image.shape, patch.shape, patch_indices, slices))
 
@@ -465,7 +465,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, mode="sample_adaptive")
 
         for patch_indices in sampler:
-            slices = self.get_slices(result, spatial_size, patch_indices, spatial_first)
+            slices = self.add_non_spatial_indices(result, spatial_size, patch_indices, spatial_first)
             result[slicer(result, slices)] = 1
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
@@ -517,13 +517,13 @@ class TestAdaptiveGridSampler(unittest.TestCase):
 
         self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, mode="sample_adaptive")
 
-    def get_slices(self, image, spatial_size, patch_indices, spatial_first):
+    def add_non_spatial_indices(self, image, spatial_size, patch_indices, spatial_first):
         non_image_dims = len(image.shape) - len(spatial_size)
         if spatial_first:
             slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([None] * non_image_dims)
+            slices.extend([[None]] * non_image_dims)
         else:
-            slices = [None] * non_image_dims
+            slices = [[None]] * non_image_dims
             slices.extend([index_pair.tolist() for index_pair in patch_indices])
         return slices
 

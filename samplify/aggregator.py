@@ -83,8 +83,11 @@ class _Aggregator:
             weight_patch = weights
         else:
             raise RuntimeError("The given type of weights is not supported.")
+        weight_patch = self.broadcast_to(weight_patch, self.add_non_spatial_dims(weight_patch.shape, self.output.shape))
+
         if self.softmax_dim is None:
             weight_map = np.zeros(self.spatial_size, dtype=np.float32)
+            weight_map = self.broadcast_to(weight_map, self.add_non_spatial_dims(weight_map.shape, self.output.shape))
         else:
             weight_map = None
         return weight_patch, weight_map
@@ -97,10 +100,10 @@ class _Aggregator:
         """
         if self.computed_inplace:
             raise RuntimeError("get_output() has already been called with inplace=True. Therefore, no further patches can be appended.")
-        slices = self.add_non_spatial_dims(self.output, patch_indices)
+        slices = self.add_non_spatial_indices(self.output, patch_indices)
         self.output[slicer(self.output, slices)] += patch.astype(self.output.dtype) * self.weight_patch.astype(self.output.dtype)
         if self.weight_map is not None:
-            weight_map_patch = self.weight_map[slicer(self.weight_map, patch_indices)]  # weight_map_patch is only a reference to a patch in self.weight_map
+            weight_map_patch = self.weight_map[slicer(self.weight_map, slices)]  # weight_map_patch is only a reference to a patch in self.weight_map
             weight_map_patch[...] += self.weight_patch  # Adds patch to the map. [...] enables the use of memory-mapped array-like data
 
     def get_output(self, inplace: bool = False):
@@ -134,15 +137,40 @@ class _Aggregator:
         gaussian_weights[gaussian_weights == 0] = np.min(gaussian_weights[gaussian_weights != 0])
         return gaussian_weights
 
-    def add_non_spatial_dims(self, output, patch_indices):
+    def add_non_spatial_dims(self, spatial_data_size_a, data_size_b):
+        non_spatial_dims = len(data_size_b) - len(self.spatial_size)
+        if non_spatial_dims > 0 and self.spatial_first:
+            non_spatial_dims = data_size_b[len(self.spatial_size):]
+            data_size_a = (*spatial_data_size_a, *non_spatial_dims)
+            return data_size_a
+        elif non_spatial_dims > 0:
+            non_spatial_dims = data_size_b[:-len(self.spatial_size)]
+            data_size_a = (*non_spatial_dims, *spatial_data_size_a)
+            return data_size_a
+        else:
+            return spatial_data_size_a
+
+    def add_non_spatial_indices(self, output, patch_indices):
         non_spatial_dims = len(output.shape) - len(self.spatial_size)
         if self.spatial_first:
-            slices = [None] * non_spatial_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        else:
             slices = [index_pair.tolist() for index_pair in patch_indices]
             slices.extend([None] * non_spatial_dims)
+        else:
+            slices = [None] * non_spatial_dims
+            slices.extend([index_pair.tolist() for index_pair in patch_indices])
         return slices
+
+    def broadcast_to(self, data, target_shape):
+        if self.spatial_first:
+            non_spatial_dims = len(target_shape) - len(data.shape)
+            data_reshaped = data
+            for _ in range(non_spatial_dims):
+                data_reshaped = data_reshaped[..., np.newaxis]
+            data_reshaped = np.broadcast_to(data_reshaped, target_shape)
+        else:
+            data_reshaped = np.broadcast_to(data, target_shape)
+        data_reshaped = np.copy(data_reshaped)
+        return data_reshaped
 
 
 class _ChunkAggregator(_Aggregator):
@@ -228,43 +256,30 @@ class _ChunkAggregator(_Aggregator):
     def process_chunk(self, chunk_id):
         # If they are all not None, create a softmax array of size chunk_size with number classes as channels
         patch_shape = self.chunk_patches_dicts[chunk_id][list(self.chunk_patches_dicts[chunk_id].keys())[0]].shape
-        chunk_size = self.add_non_spatial_chunk_dims(self.chunk_size, patch_shape)
+        chunk_size = self.add_non_spatial_dims(self.chunk_size, patch_shape)
         chunk = np.zeros(chunk_size, dtype=self.chunk_dtype)
         # Weight each patch during insertion
         sampler_offset = self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
         for patch_indices_key, patch in self.chunk_patches_dicts[chunk_id].items():
             patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
             patch_indices -= sampler_offset
-            slices = self.add_non_spatial_dims(chunk, patch_indices)
+            slices = self.add_non_spatial_indices(chunk, patch_indices)
             chunk[slicer(chunk, slices)] += patch.astype(chunk.dtype) * self.weight_patch.astype(chunk.dtype)
         if self.softmax_dim is not None:
             # Argmax the softmax chunk
             chunk = chunk.argmax(axis=self.softmax_dim).astype(np.uint16)
         # Crop the chunk
         crop_indices = self.chunk_indices[chunk_id] - sampler_offset
-        crop_indices = self.add_non_spatial_dims(chunk, crop_indices)
+        crop_indices = self.add_non_spatial_indices(chunk, crop_indices)
         chunk = chunk[slicer(chunk, crop_indices)]
         # Write the chunk into the global output
         crop_indices = self.chunk_indices[chunk_id]
-        crop_indices = self.add_non_spatial_dims(self.output, crop_indices)
+        crop_indices = self.add_non_spatial_indices(self.output, crop_indices)
         self.output[slicer(self.output, crop_indices)] = chunk
         # Set all self.chunk_patches_dicts[chunk_id] values to None
         for key in self.chunk_patches_dicts[chunk_id].keys():
             self.chunk_patches_dicts[chunk_id][key] = None
         # print("Finished saving chunk ", chunk_id, flush=True)
-
-    def add_non_spatial_chunk_dims(self, spatial_chunk_size, patch_shape):
-        non_spatial_dims = len(patch_shape) - len(self.spatial_size)
-        if non_spatial_dims > 0 and self.spatial_first:
-            non_spatial_dims = patch_shape[self.spatial_size:]
-            chunk_size = (*spatial_chunk_size, *non_spatial_dims)
-            return chunk_size
-        elif non_spatial_dims > 0:
-            non_spatial_dims = patch_shape[:self.spatial_size]
-            chunk_size = (*non_spatial_dims, *spatial_chunk_size)
-            return chunk_size
-        else:
-            return spatial_chunk_size
 
     def get_output(self, inplace: bool = False):
         return self.output

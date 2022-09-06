@@ -66,6 +66,7 @@ class _Aggregator:
             raise RuntimeError("Either the output array-like data or the output size must be given.")
         elif output is not None and output_size is not None and output.shape != output_size:
             raise RuntimeError("The variable output_size must be equal to the output shape if both are given. Only one of the two must be given.")
+        return output
 
     def check_sanity(self):
         if np.any(self.patch_size > self.spatial_size):

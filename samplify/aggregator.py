@@ -86,7 +86,10 @@ class _Aggregator:
         weight_patch = self.broadcast_to(weight_patch, self.add_non_spatial_dims(weight_patch.shape, self.output.shape))
 
         if self.softmax_dim is None:
-            weight_map = np.zeros(self.spatial_size, dtype=np.float32)
+            if weights == 'avg':
+                weight_map = np.zeros(self.spatial_size, dtype=np.uint16)
+            else:
+                weight_map = np.zeros(self.spatial_size, dtype=np.float32)
             weight_map = self.broadcast_to(weight_map, self.add_non_spatial_dims(weight_map.shape, self.output.shape))
         else:
             weight_map = None

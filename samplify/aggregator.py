@@ -1,6 +1,6 @@
 import numpy as np
 from samplify.sampler import GridSampler, _EdgeGridSampler
-from slicer import slicer
+from samplify.slicer import slicer
 from scipy.ndimage.filters import gaussian_filter
 from collections import defaultdict
 import copy
@@ -109,7 +109,7 @@ class _Aggregator:
         :return: The final aggregated output.
         """
         if not inplace:
-            output = np.zeros_like(self.output)
+            output = np.copy(self.output)
         else:
             output = self.output
 

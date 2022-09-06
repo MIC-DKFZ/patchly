@@ -56,16 +56,16 @@ class GridSampler:
 
     def create_sampler(self):
         if self.mode == "sample_edge" and self.chunk_size is None:
-            sampler = _EdgeGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
+            sampler = _EdgeGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
         elif self.mode == "sample_edge" and self.chunk_size is not None:
             sampler = _ChunkGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
-                                        spatial_first=not self.spatial_first)
+                                        spatial_first=self.spatial_first)
         elif self.mode == "sample_adaptive" and self.chunk_size is None:
-            sampler = _AdaptiveGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
+            sampler = _AdaptiveGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
         elif self.mode == "sample_adaptive" and self.chunk_size is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         elif self.mode == "sample_crop" and self.chunk_size is None:
-            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=not self.spatial_first)
+            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
         elif self.mode == "sample_crop" and self.chunk_size is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         elif self.mode.startswith('pad_') and self.chunk_size is None:
@@ -172,26 +172,26 @@ class _CropGridSampler:
 
     def slice_patch(self, patch_indices):
         if self.image is not None and not isinstance(self.image, dict):
-            slices = self.add_non_spatial_dims(self.image, patch_indices)
+            slices = self.add_non_spatial_indices(self.image, patch_indices)
             patch = self.image[slicer(self.image, slices)]
             return patch, patch_indices
         elif self.image is not None and isinstance(self.image, dict):
             patch_dict = {}
             for key in self.image.keys():
-                slices = self.add_non_spatial_dims(self.image[key], patch_indices)
+                slices = self.add_non_spatial_indices(self.image[key], patch_indices)
                 patch_dict[key] = self.image[key][slicer(self.image[key], slices)]
             return patch_dict, patch_indices
         else:
             return patch_indices
 
-    def add_non_spatial_dims(self, image, patch_indices):
+    def add_non_spatial_indices(self, image, patch_indices):
         non_spatial_dims = len(image.shape) - len(self.spatial_size)
         if self.spatial_first:
-            slices = [None] * non_spatial_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        else:
             slices = [index_pair.tolist() for index_pair in patch_indices]
             slices.extend([None] * non_spatial_dims)
+        else:
+            slices = [None] * non_spatial_dims
+            slices.extend([index_pair.tolist() for index_pair in patch_indices])
         return slices
 
 

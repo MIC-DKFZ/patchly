@@ -188,9 +188,9 @@ class _CropGridSampler:
         non_spatial_dims = len(image.shape) - len(self.spatial_size)
         if self.spatial_first:
             slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([None] * non_spatial_dims)
+            slices.extend([[None]] * non_spatial_dims)
         else:
-            slices = [None] * non_spatial_dims
+            slices = [[None]] * non_spatial_dims
             slices.extend([index_pair.tolist() for index_pair in patch_indices])
         return slices
 

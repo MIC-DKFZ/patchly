@@ -4,6 +4,7 @@ import zarr
 from samplify.sampler import GridSampler
 from samplify.aggregator import Aggregator
 from samplify.slicer import slicer
+from scipy.ndimage.filters import gaussian_filter
 
 
 class TestGridSampler(unittest.TestCase):
@@ -139,6 +140,20 @@ class TestGridSampler(unittest.TestCase):
 
         self._test_aggregator(image, spatial_size, patch_size, output=output)
 
+    def test_gaussian_weights(self):
+        patch_size = (100, 100)
+        spatial_size = (100, 100)
+        image = np.random.random(spatial_size)
+
+        weights = self.create_gaussian_weights(np.asarray(patch_size))
+
+        expected_output = image * weights
+
+        output1, output2 = self._test_aggregator(image, spatial_size, patch_size)
+
+        np.testing.assert_almost_equal(output1, expected_output, decimal=6)
+        np.testing.assert_almost_equal(output2, expected_output, decimal=6)
+
     # def test_patch_size_larger_than_spatial_size(self):
     #     patch_size = (101, 100)
     #     spatial_size = (100, 100)
@@ -163,9 +178,9 @@ class TestGridSampler(unittest.TestCase):
         for patch, patch_indices in sampler:
             aggregator.append(patch, patch_indices)
 
-        _output = aggregator.get_output()
+        output1 = aggregator.get_output()
 
-        np.testing.assert_almost_equal(image, _output, decimal=6)
+        np.testing.assert_almost_equal(image, output1, decimal=6)
 
         # Test without output array
         if output is None:
@@ -176,9 +191,21 @@ class TestGridSampler(unittest.TestCase):
         for patch, patch_indices in sampler:
             aggregator.append(patch, patch_indices)
 
-        _output = aggregator.get_output()
+        output2 = aggregator.get_output()
 
-        np.testing.assert_almost_equal(image, _output, decimal=6)
+        np.testing.assert_almost_equal(image, output2, decimal=6)
+
+        return output1, output2
+
+    def create_gaussian_weights(self, size):
+        sigma_scale = 1. / 8
+        sigmas = size * sigma_scale
+        center_coords = size // 2
+        tmp = np.zeros(size)
+        tmp[tuple(center_coords)] = 1
+        gaussian_weights = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
+        gaussian_weights[gaussian_weights == 0] = np.min(gaussian_weights[gaussian_weights != 0])
+        return gaussian_weights
 
     def add_non_spatial_indices(self, image, spatial_size, patch_indices, spatial_first):
         non_image_dims = len(image.shape) - len(spatial_size)

@@ -5,6 +5,7 @@ from samplify.sampler import GridSampler
 from samplify.aggregator import Aggregator
 from samplify.slicer import slicer
 from scipy.ndimage.filters import gaussian_filter
+import copy
 
 
 class TestGridSampler(unittest.TestCase):
@@ -141,28 +142,28 @@ class TestGridSampler(unittest.TestCase):
         self._test_aggregator(image, spatial_size, patch_size, output=output)
 
     def test_gaussian_weights(self):
-        patch_size = (50, 100)
-        patch_overlap = (25, 100)
-        spatial_size = (100, 100)
+        patch_size = (10, 10)
+        patch_overlap = (5, 10)
+        spatial_size = (20, 10)
         image = np.random.random(spatial_size)
 
         expected_output = np.zeros_like(image)
         weights = self.create_gaussian_weights(np.asarray(patch_size))
         weight_map = np.zeros_like(image)
 
-        expected_output[:50, :] += image[:50, :] * weights * 0
-        expected_output[25:75, :] += image[25:75, :] * weights * 1
-        expected_output[50:, :] += image[50:, :] * weights * 2
-        weight_map[:50, :] += weights
-        weight_map[25:75, :] += weights
-        weight_map[50:, :] += weights
+        expected_output[:10, :] += image[:10, :] * weights * 0
+        expected_output[5:15, :] += image[5:15, :] * weights * 1
+        expected_output[10:, :] += image[10:, :] * weights * 2
+        weight_map[:10, :] += weights
+        weight_map[5:15, :] += weights
+        weight_map[10:, :] += weights
         expected_output /= weight_map
         expected_output = np.nan_to_num(expected_output)
 
         output1, output2 = self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap, weights='gaussian', multiply_patch_by_index=True)
 
-        np.testing.assert_almost_equal(output1, expected_output, decimal=4)
-        np.testing.assert_almost_equal(output2, expected_output, decimal=4)
+        np.testing.assert_almost_equal(output1, expected_output, decimal=6)
+        np.testing.assert_almost_equal(output2, expected_output, decimal=6)
 
     # def test_patch_size_larger_than_spatial_size(self):
     #     patch_size = (101, 100)
@@ -182,7 +183,7 @@ class TestGridSampler(unittest.TestCase):
 
     def _test_aggregator(self, image, spatial_size, patch_size, patch_overlap=None, spatial_first=True, output=None, weights='avg', multiply_patch_by_index=False):
         # Test with output size
-        sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_edge")
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_edge")
         aggregator = Aggregator(sampler=sampler, output_size=image.shape, weights=weights)
 
         for i, (patch, patch_indices) in enumerate(sampler):
@@ -200,8 +201,8 @@ class TestGridSampler(unittest.TestCase):
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_edge")
-        aggregator = Aggregator(sampler=sampler, output=output)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_edge")
+        aggregator = Aggregator(sampler=sampler, output=output, weights=weights)
 
         for i, (patch, patch_indices) in enumerate(sampler):
             if multiply_patch_by_index:

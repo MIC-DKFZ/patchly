@@ -285,6 +285,7 @@ class _ChunkAggregator(_Aggregator):
         # print("Finished saving chunk ", chunk_id, flush=True)
 
     def get_output(self, inplace: bool = False):
+        self.executor.shutdown(wait=True)
         return self.output
 
 

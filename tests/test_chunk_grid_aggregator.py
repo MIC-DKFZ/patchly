@@ -8,142 +8,160 @@ from scipy.ndimage.filters import gaussian_filter
 import copy
 
 
-class TestGridAggregator(unittest.TestCase):
+class TestChunkGridAggregator(unittest.TestCase):
     def test_without_overlap_without_remainder_2d(self):
         patch_size = (10, 10)
         spatial_size = (100, 100)
+        chunk_size = (50, 50)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size)
 
     def test_without_overlap_with_remainder_2d(self):
         patch_size = (10, 10)
         spatial_size = (103, 107)
+        chunk_size = (50, 50)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size)
 
     def test_with_overlap_without_remainder_2d(self):
         patch_overlap = (5, 5)
         patch_size = (10, 10)
+        chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
 
     def test_with_overlap_with_remainder_2d(self):
         patch_overlap = (5, 5)
         patch_size = (10, 10)
+        chunk_size = (50, 50)
         spatial_size = (103, 107)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
 
     def test_without_overlap_without_remainder_3d(self):
         patch_size = (10, 10, 5)
+        chunk_size = (50, 50, 25)
         spatial_size = (100, 100, 50)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size)
 
     def test_without_overlap_with_remainder_3d(self):
         patch_size = (10, 10, 5)
+        chunk_size = (50, 50, 25)
         spatial_size = (103, 107, 51)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size)
 
     def test_with_overlap_without_remainder_3d(self):
         patch_overlap = (5, 5, 5)
         patch_size = (10, 10, 5)
+        chunk_size = (50, 50, 25)
         spatial_size = (100, 100, 50)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
 
     def test_with_overlap_with_remainder_3d(self):
         patch_overlap = (5, 5, 5)
         patch_size = (10, 10, 5)
+        chunk_size = (50, 50, 25)
         spatial_size = (103, 107, 51)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
 
     def test_without_overlap_without_remainder_Nd(self):
         patch_size = (2, 8, 4, 4, 4)
+        chunk_size = (4, 16, 8, 8, 4)
         spatial_size = (4, 16, 8, 8, 4)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size)
 
     def test_without_overlap_with_remainder_Nd(self):
         patch_size = (2, 8, 4, 4, 4)
+        chunk_size = (4, 16, 8, 8, 4)
         spatial_size = (5, 18, 9, 10, 6)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size)
 
     def test_with_overlap_without_remainder_Nd(self):
         patch_overlap = (1, 8, 2, 2, 2)
         patch_size = (2, 8, 4, 4, 4)
+        chunk_size = (4, 16, 8, 8, 4)
         spatial_size = (4, 16, 8, 8, 4)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
 
     def test_with_overlap_with_remainder_Nd(self):
         patch_overlap = (1, 8, 2, 2, 2)
         patch_size = (2, 8, 4, 4, 4)
+        chunk_size = (4, 16, 8, 8, 4)
         spatial_size = (5, 18, 9, 10, 6)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
 
     def test_channel_first(self):
         patch_size = (10, 10)
+        chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((3, *spatial_size))
         spatial_first = False
 
-        self._test_aggregator(image, spatial_size, patch_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
 
     def test_channel_last(self):
         patch_size = (10, 10)
+        chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((*spatial_size, 5))
         spatial_first = True
 
-        self._test_aggregator(image, spatial_size, patch_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
 
     def test_batch_and_channel_dim(self):
         patch_size = (10, 10)
+        chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((4, 3, *spatial_size))
         spatial_first = False
 
-        self._test_aggregator(image, spatial_size, patch_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
 
     def test_multiple_non_spatial_dims(self):
         patch_size = (10, 10)
+        chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((5, 4, 3, *spatial_size))
         spatial_first = False
 
-        self._test_aggregator(image, spatial_size, patch_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
 
     def test_zarr(self):
         patch_size = (10, 10)
+        chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
         image = zarr.array(image)
         output = np.zeros_like(image)
         output = zarr.array(output)
 
-        self._test_aggregator(image, spatial_size, patch_size, output=output)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, output=output)
 
     def test_gaussian_weights(self):
         patch_size = (10, 10)
         patch_overlap = (5, 10)
+        chunk_size = (10, 10)
         spatial_size = (20, 10)
         image = np.random.random(spatial_size)
 
@@ -160,7 +178,7 @@ class TestGridAggregator(unittest.TestCase):
         expected_output /= weight_map
         expected_output = np.nan_to_num(expected_output)
 
-        output1, output2 = self._test_aggregator(image, spatial_size, patch_size, patch_overlap=patch_overlap, weights='gaussian', multiply_patch_by_index=True)
+        output1, output2 = self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap, weights='gaussian', multiply_patch_by_index=True)
 
         np.testing.assert_almost_equal(output1, expected_output, decimal=6)
         np.testing.assert_almost_equal(output2, expected_output, decimal=6)
@@ -181,40 +199,42 @@ class TestGridAggregator(unittest.TestCase):
     #
     #     self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, mode="sample_edge")
 
-    def _test_aggregator(self, image, spatial_size, patch_size, patch_overlap=None, spatial_first=True, output=None, weights='avg', multiply_patch_by_index=False):
+    def _test_aggregator(self, image, spatial_size, patch_size, chunk_size, patch_overlap=None, spatial_first=True, output=None, weights='avg', multiply_patch_by_index=False):
         # Test with output size
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_edge")
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first, mode="sample_edge")
         aggregator = Aggregator(sampler=sampler, output_size=image.shape, weights=weights)
 
-        for i, (patch, patch_indices) in enumerate(sampler):
+        for i, (patch, patch_indices, chunk_id) in enumerate(sampler):
             if multiply_patch_by_index:
                 _patch = patch * i
             else:
                 _patch = patch
-            aggregator.append(_patch, patch_indices)
+            aggregator.append(_patch, patch_indices, chunk_id)
 
         output1 = aggregator.get_output()
 
         if not multiply_patch_by_index:
-            np.testing.assert_almost_equal(image, output1, decimal=6)
+            tmp = np.abs(image - output1)
+            tmp2 = np.sum(tmp)
+            np.testing.assert_almost_equal(np.array(image), np.array(output1), decimal=6)
 
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_edge")
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first, mode="sample_edge")
         aggregator = Aggregator(sampler=sampler, output=output, weights=weights)
 
-        for i, (patch, patch_indices) in enumerate(sampler):
+        for i, (patch, patch_indices, chunk_id) in enumerate(sampler):
             if multiply_patch_by_index:
                 _patch = patch * i
             else:
                 _patch = patch
-            aggregator.append(_patch, patch_indices)
+            aggregator.append(_patch, patch_indices, chunk_id)
 
         output2 = aggregator.get_output()
 
         if not multiply_patch_by_index:
-            np.testing.assert_almost_equal(image, output2, decimal=6)
+            np.testing.assert_almost_equal(np.array(image), np.array(output2), decimal=6)
 
         return output1, output2
 

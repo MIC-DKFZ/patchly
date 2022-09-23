@@ -74,7 +74,7 @@ class _Aggregator:
         # TODO: Check spatial_size == output.shape. Consider non-spatial dims and spatial_first
         # TODO: Check spatial_size == output_size. Consider non-spatial dims and spatial_first
 
-    def set_weights(self, weights):
+    def set_weights(self, weights, weight_map_size=None):
         if weights == 'avg':
             weight_patch = np.ones(self.patch_size, dtype=np.uint8)
         elif weights == 'gaussian':
@@ -86,10 +86,12 @@ class _Aggregator:
         weight_patch = self.broadcast_to(weight_patch, self.add_non_spatial_dims(weight_patch.shape, self.output.shape))
 
         if self.softmax_dim is None:
+            if weight_map_size is None:
+                weight_map_size = self.spatial_size
             if weights == 'avg':
-                weight_map = np.zeros(self.spatial_size, dtype=np.uint16)
+                weight_map = np.zeros(weight_map_size, dtype=np.uint16)
             else:
-                weight_map = np.zeros(self.spatial_size, dtype=np.float32)
+                weight_map = np.zeros(weight_map_size, dtype=np.float32)
             weight_map = self.broadcast_to(weight_map, self.add_non_spatial_dims(weight_map.shape, self.output.shape))
         else:
             weight_map = None
@@ -194,6 +196,7 @@ class _ChunkAggregator(_Aggregator):
         self.patch_overlap = patch_overlap
         self.chunk_size = chunk_size
         self.chunk_dtype = self.set_chunk_dtype()
+        self.weight_patch, self.weight_map = self.set_weights(weights, self.chunk_size)
         self.mode = mode
         self.compute_indices()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
@@ -244,10 +247,14 @@ class _ChunkAggregator(_Aggregator):
             raise RuntimeError("patch_indices_key not in self.chunk_patches_dicts[chunk_id]! patch_indices: {}. Offset for chunk_id {} is{}. unhashed_keys: {}".format(
                 patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], unhashed_keys))
         self.chunk_patches_dicts[chunk_id][patch_indices_key] = patch
+        # if self.weight_map is not None:
+        #     slices = self.add_non_spatial_indices(self.output, patch_indices)
+        #     weight_map_patch = self.weight_map[slicer(self.weight_map, slices)]  # weight_map_patch is only a reference to a patch in self.weight_map
+        #     weight_map_patch[...] += self.weight_patch  # Adds patch to the map. [...] enables the use of memory-mapped array-like data
         if self.is_chunk_complete(chunk_id):
             # print("chunk_id: ", chunk_id)
-            # self.process_chunk(chunk_id)
-            self.executor.submit(self.process_chunk, chunk_id)
+            self.process_chunk(chunk_id)
+            # self.executor.submit(self.process_chunk, chunk_id)
 
     def is_chunk_complete(self, chunk_id):
         # Check if all self.chunk_patches_dicts[chunk_id] values are not None
@@ -263,11 +270,18 @@ class _ChunkAggregator(_Aggregator):
         chunk = np.zeros(chunk_size, dtype=self.chunk_dtype)
         # Weight each patch during insertion
         sampler_offset = self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
+        self.weight_map.fill(0.)
         for patch_indices_key, patch in self.chunk_patches_dicts[chunk_id].items():
             patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
             patch_indices -= sampler_offset
             slices = self.add_non_spatial_indices(chunk, patch_indices)
             chunk[slicer(chunk, slices)] += patch.astype(chunk.dtype) * self.weight_patch.astype(chunk.dtype)
+            if self.weight_map is not None:
+                slices = self.add_non_spatial_indices(self.output, patch_indices)
+                self.weight_map[slicer(self.weight_map, slices)] += self.weight_patch
+        if self.weight_map is not None:
+            chunk = chunk / self.weight_map.astype(chunk.dtype)
+            chunk = np.nan_to_num(chunk)
         if self.softmax_dim is not None:
             # Argmax the softmax chunk
             chunk = chunk.argmax(axis=self.softmax_dim).astype(np.uint16)

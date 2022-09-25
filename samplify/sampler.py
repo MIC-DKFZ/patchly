@@ -1,7 +1,5 @@
 import numpy as np
 from samplify.slicer import slicer
-from torch.utils.data import Dataset
-from skimage import transform as ski_transform
 import copy
 import random
 import augmentify as aug
@@ -11,7 +9,7 @@ import numpy.typing as npt
 
 class GridSampler:
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Optional[Union[Tuple, npt.ArrayLike]] = None,
-                 chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = 'sample_edge'):
+                 chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = 'sample_edge', pad_kwargs: dict = None):
         """
         TODO description
         If no image is given then only patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
@@ -25,7 +23,7 @@ class GridSampler:
         The patch overlap excludes the channel, batch and any other non-spatial dimensionality.
         :param chunk_size: The spatial shape of the chunk size. If given, the image is divided into chunks and patches are sampled from a single chunk until the chunk is depleted.
         This enables patch sampling of larger-than-RAM images in combination with memory-mapped arrays. The chunk size is required to be a multiple of the patch size.
-        The chunk size excludes the channel, batch and any other non-spatial dimensionality. An in-depth explanation of chunked sampling can be found here: LINK
+        The chunk size excludes the channel, batch and any other non-spatial dimensionality. An in-depth explanation of chunk sampling can be found here: LINK
         :param spatial_first: Denotes that the spatial dimensions of the image are located before the non-spatial dimensions e.g. (Width, Height, Channel).
         Otherwise, the reverse is true e.g. (Channel, Width, Height).
         :param mode: TODO
@@ -37,6 +35,8 @@ class GridSampler:
         self.chunk_size = self.set_chunk_size(chunk_size)
         self.spatial_first = spatial_first
         self.mode = mode
+        self.pad_kwargs = pad_kwargs
+        self.pad_width = None
         self.check_sanity()
         self.sampler = self.create_sampler()
 
@@ -68,10 +68,9 @@ class GridSampler:
             sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
         elif self.mode == "sample_crop" and self.chunk_size is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        elif self.mode.startswith('pad_') and self.chunk_size is None:
-            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        elif self.mode.startswith('pad_') and self.chunk_size is not None:
-            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
+        elif self.mode.startswith('pad_'):
+            self.pad_image()
+            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
         else:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         return sampler
@@ -99,6 +98,36 @@ class GridSampler:
             raise RuntimeError("The patch size ({}) is required to be a multiple of the patch overlap ({}) when using chunked images.".format(self.patch_size, self.patch_overlap))
         if self.chunk_size is not None and (self.chunk_size % self.patch_size != 0).any():
             raise RuntimeError("The chunk size ({}) is required to be a multiple of the patch size ({}).".format(self.chunk_size, self.patch_size))
+        if self.mode.startswith('pad_') and (self.image is None or not isinstance(self.image, np.ndarray)):
+            raise RuntimeError("The given sampling mode ({}) requires the image to be given and as type np.ndarray.".format(self.mode))
+        if self.mode.startswith('pad_') and self.chunk_size is not None:
+            raise RuntimeError("The given sampling mode ({}) is not compatible with chunk sampling.".format(self.mode))
+
+    def pad_image(self):
+        if self.mode.startswith('pad_end_'):
+            pad_width_after = np.asarray(self.spatial_size) - np.asarray(self.image.shape)
+            pad_width_after = np.clip(pad_width_after, a_min=0, a_max=None)
+            self.spatial_size += pad_width_after
+            pad_width_after = pad_width_after[..., np.newaxis]
+            pad_width = np.hstack((np.zeros_like(pad_width_after), pad_width_after))
+            pad_mode = self.mode[8:]
+        elif self.mode.startswith('pad_edges_'):
+            pad_width_after = np.asarray(self.spatial_size) - np.asarray(self.image.shape)
+            pad_width_after = np.clip(pad_width_after, a_min=0, a_max=None)
+            self.spatial_size += pad_width_after
+            pad_width_before = pad_width_after // 2
+            pad_width_after = pad_width_after - pad_width_before
+            pad_width_after = pad_width_after[..., np.newaxis]
+            pad_width_before = pad_width_before[..., np.newaxis]
+            pad_width = np.hstack((pad_width_before, pad_width_after))
+            pad_mode = self.mode[10:]
+        else:
+            raise RuntimeError("The given sampling mode ({}) is not supported.".format(self.mode))
+
+        if self.pad_kwargs is None:
+            self.pad_kwargs = {}
+        self.image = np.pad(self.image, pad_width, mode=pad_mode, **self.pad_kwargs)
+        self.pad_width = pad_width
 
     def __iter__(self):
         return self.sampler.__iter__()

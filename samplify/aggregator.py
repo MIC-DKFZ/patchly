@@ -11,6 +11,7 @@ import numpy.typing as npt
 
 class Aggregator:
     def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None):
+        self.sampler = sampler
         self.aggregator = self.set_aggregator(sampler, output_size, output, weights, softmax_dim)
 
     def set_aggregator(self, sampler, output_size, output, weights, softmax_dim):
@@ -34,7 +35,16 @@ class Aggregator:
         self.aggregator.append(patch, patch_indices, chunk_id)
 
     def get_output(self, inplace: bool = False):
-        return self.aggregator.get_output(inplace)
+        output = self.aggregator.get_output(inplace)
+        if self.sampler.pad_width is not None:
+            output = self.unpad_output(output, self.sampler.pad_width)
+        return output
+
+    def unpad_output(self, output, pad_width):
+        pad_width[:, 1] *= -1
+        crop_slices = slicer(output, pad_width)
+        output = output[crop_slices]
+        return output
 
 
 class _Aggregator:

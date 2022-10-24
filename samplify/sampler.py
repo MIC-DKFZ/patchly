@@ -2,7 +2,7 @@ import numpy as np
 from samplify.slicer import slicer
 import copy
 import random
-import augmentify as aug
+# import augmentify as aug
 from typing import Union, Optional, Tuple
 import numpy.typing as npt
 
@@ -515,101 +515,101 @@ class _ChunkGridSampler(_CropGridSampler):
 #             return output
 
 
-class UniformSampler:
-    def __init__(self, subjects, spatial_dims, patch_size, length, seed=None, channel_first=True):
-        self.subjects = subjects
-        self.spatial_dims = spatial_dims
-        self.patch_size = np.asarray(patch_size)
-        self.length = length
-        self.channel_first = channel_first
-        self.seeded_patches = self.seed_patches(seed)
-
-    def seed_patches(self, seed):
-        if seed is None:
-            return None
-        else:
-            np.random.seed(seed)
-            seeded_patches = {}
-            for idx in range(self.length):
-                subject_name, patch_indices, class_id = self.get_patch()
-                seeded_patches[idx] = {"subject_name": subject_name, "patch_indices": patch_indices, "class_id": class_id}
-            np.random.seed()
-            return seeded_patches
-
-    def __iter__(self):
-        self.index = 0
-        return self
-
-    def __len__(self):
-        return self.length
-
-    def __getitem__(self, idx):
-        if self.seeded_patches is None:
-            subject_name, patch_indices, class_id = self.get_patch()
-        else:
-            subject_name = self.seeded_patches[idx]["subject_name"]
-            patch_indices = self.seeded_patches[idx]["patch_indices"]
-            class_id = self.seeded_patches[idx]["class_id"]
-
-        patch_dict = {}
-        for key in self.subjects[subject_name].keys():
-            slices = self.get_slices(self.subjects[subject_name][key], patch_indices)
-            patch_dict[key] = self.subjects[subject_name][key][slicer(self.subjects[subject_name][key], slices)]
-        patch_dict["patch_indices"] = patch_indices
-        patch_dict["subject_name"] = subject_name
-        # mask = patch_dict[aug.SEG] == class_id
-        # has_class = np.max(mask) == 1
-        # print("class: {}, has_class: {}".format(class_id, has_class))
-        return patch_dict
-
-    def get_patch(self):
-        subject_idx = random.randint(0, len(self.subjects) - 1)
-        subject_name = self.subjects.index(subject_idx)
-        pos = self.random_position(self.patch_size, self.subjects[subject_name][aug.IMAGE].shape[-self.spatial_dims:])
-        patch_indices = np.stack((pos, pos + self.patch_size), axis=1)
-        return subject_name, patch_indices, None
-
-    def __next__(self):
-        if self.index < self.length:
-            output = self.__getitem__(self.index)
-            self.index += 1
-            return output
-        else:
-            raise StopIteration
-
-    def get_slices(self, image, patch_indices):
-        non_spatial_dims = len(image.shape) - self.spatial_dims
-        if self.channel_first:
-            slices = [None] * non_spatial_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        else:
-            slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([None] * non_spatial_dims)
-        return slices
-
-    def random_position(self, patch_size, image_shape):
-        pos = [random.randint(0, image_shape[axis] - patch_size[axis]) for axis in range(len(self.patch_size))]
-        return pos
-
-
-class WeightedSampler(UniformSampler):
-    def __init__(self, subjects, spatial_dims, patch_size, length, population, class_weights=None, seed=None, channel_first=True):
-        self.population = population
-        self.class_weights = class_weights
-        super().__init__(subjects, spatial_dims, patch_size, length, seed, channel_first)
-
-    def get_patch(self):
-        position, subject_name, class_id = self.population.get_sample(self.class_weights)
-        image_shape = self.population.map_shapes[subject_name]
-        position = self.random_position_around_point(position, self.patch_size, image_shape, self.patch_size - 1)
-        patch_indices = np.stack((position, position + self.patch_size), axis=1)
-        return subject_name, patch_indices, class_id
-
-    def random_position_around_point(self, position, patch_size, image_shape, max_movement):
-        min_pos = [max(0, position[axis] - (patch_size[axis] - max_movement[axis])) for axis in range(len(patch_size))]
-        max_pos = [min(position[axis], image_shape[axis] - patch_size[axis]) for axis in range(len(patch_size))]
-        pos = [random.randint(min_pos[axis], max_pos[axis]) if min_pos[axis] < max_pos[axis] else max_pos[axis] for axis in range(len(self.patch_size))]
-        return pos
+# class UniformSampler:
+#     def __init__(self, subjects, spatial_dims, patch_size, length, seed=None, channel_first=True):
+#         self.subjects = subjects
+#         self.spatial_dims = spatial_dims
+#         self.patch_size = np.asarray(patch_size)
+#         self.length = length
+#         self.channel_first = channel_first
+#         self.seeded_patches = self.seed_patches(seed)
+#
+#     def seed_patches(self, seed):
+#         if seed is None:
+#             return None
+#         else:
+#             np.random.seed(seed)
+#             seeded_patches = {}
+#             for idx in range(self.length):
+#                 subject_name, patch_indices, class_id = self.get_patch()
+#                 seeded_patches[idx] = {"subject_name": subject_name, "patch_indices": patch_indices, "class_id": class_id}
+#             np.random.seed()
+#             return seeded_patches
+#
+#     def __iter__(self):
+#         self.index = 0
+#         return self
+#
+#     def __len__(self):
+#         return self.length
+#
+#     def __getitem__(self, idx):
+#         if self.seeded_patches is None:
+#             subject_name, patch_indices, class_id = self.get_patch()
+#         else:
+#             subject_name = self.seeded_patches[idx]["subject_name"]
+#             patch_indices = self.seeded_patches[idx]["patch_indices"]
+#             class_id = self.seeded_patches[idx]["class_id"]
+#
+#         patch_dict = {}
+#         for key in self.subjects[subject_name].keys():
+#             slices = self.get_slices(self.subjects[subject_name][key], patch_indices)
+#             patch_dict[key] = self.subjects[subject_name][key][slicer(self.subjects[subject_name][key], slices)]
+#         patch_dict["patch_indices"] = patch_indices
+#         patch_dict["subject_name"] = subject_name
+#         # mask = patch_dict[aug.SEG] == class_id
+#         # has_class = np.max(mask) == 1
+#         # print("class: {}, has_class: {}".format(class_id, has_class))
+#         return patch_dict
+#
+#     def get_patch(self):
+#         subject_idx = random.randint(0, len(self.subjects) - 1)
+#         subject_name = self.subjects.index(subject_idx)
+#         pos = self.random_position(self.patch_size, self.subjects[subject_name][aug.IMAGE].shape[-self.spatial_dims:])
+#         patch_indices = np.stack((pos, pos + self.patch_size), axis=1)
+#         return subject_name, patch_indices, None
+#
+#     def __next__(self):
+#         if self.index < self.length:
+#             output = self.__getitem__(self.index)
+#             self.index += 1
+#             return output
+#         else:
+#             raise StopIteration
+#
+#     def get_slices(self, image, patch_indices):
+#         non_spatial_dims = len(image.shape) - self.spatial_dims
+#         if self.channel_first:
+#             slices = [None] * non_spatial_dims
+#             slices.extend([index_pair.tolist() for index_pair in patch_indices])
+#         else:
+#             slices = [index_pair.tolist() for index_pair in patch_indices]
+#             slices.extend([None] * non_spatial_dims)
+#         return slices
+#
+#     def random_position(self, patch_size, image_shape):
+#         pos = [random.randint(0, image_shape[axis] - patch_size[axis]) for axis in range(len(self.patch_size))]
+#         return pos
+#
+#
+# class WeightedSampler(UniformSampler):
+#     def __init__(self, subjects, spatial_dims, patch_size, length, population, class_weights=None, seed=None, channel_first=True):
+#         self.population = population
+#         self.class_weights = class_weights
+#         super().__init__(subjects, spatial_dims, patch_size, length, seed, channel_first)
+#
+#     def get_patch(self):
+#         position, subject_name, class_id = self.population.get_sample(self.class_weights)
+#         image_shape = self.population.map_shapes[subject_name]
+#         position = self.random_position_around_point(position, self.patch_size, image_shape, self.patch_size - 1)
+#         patch_indices = np.stack((position, position + self.patch_size), axis=1)
+#         return subject_name, patch_indices, class_id
+#
+#     def random_position_around_point(self, position, patch_size, image_shape, max_movement):
+#         min_pos = [max(0, position[axis] - (patch_size[axis] - max_movement[axis])) for axis in range(len(patch_size))]
+#         max_pos = [min(position[axis], image_shape[axis] - patch_size[axis]) for axis in range(len(patch_size))]
+#         pos = [random.randint(min_pos[axis], max_pos[axis]) if min_pos[axis] < max_pos[axis] else max_pos[axis] for axis in range(len(self.patch_size))]
+#         return pos
 
 
 if __name__ == '__main__':

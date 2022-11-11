@@ -280,7 +280,8 @@ class _ChunkAggregator(_Aggregator):
         chunk = np.zeros(chunk_size, dtype=self.chunk_dtype)
         # Weight each patch during insertion
         sampler_offset = self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
-        self.weight_map.fill(0.)
+        if self.weight_map is not None:
+            self.weight_map.fill(0.)
         for patch_indices_key, patch in self.chunk_patches_dicts[chunk_id].items():
             patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
             patch_indices -= sampler_offset

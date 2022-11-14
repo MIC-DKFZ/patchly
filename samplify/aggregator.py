@@ -81,8 +81,8 @@ class _Aggregator:
     def check_sanity(self):
         if np.any(self.patch_size > self.spatial_size):
             raise RuntimeError("The patch size ({}) cannot be larger than the spatial size ({}).".format(self.patch_size, self.spatial_size))
-        # if self.softmax_dim is not None:
-        #     raise NotImplementedError("Softmax reduction is not supported on unchunked images.")
+        if self.softmax_dim is not None and not issubclass(type(self), _ChunkAggregator):
+            raise NotImplementedError("Softmax reduction is not supported on unchunked images.")
         # TODO: Check spatial_size == output.shape. Consider non-spatial dims and spatial_first
         # TODO: Check spatial_size == output_size. Consider non-spatial dims and spatial_first
 

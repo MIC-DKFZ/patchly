@@ -10,8 +10,9 @@ import numpy.typing as npt
 
 
 class Aggregator:
-    def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None):
+    def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None, spatial_first: bool = True):
         self.sampler = sampler
+        self.spatial_first = spatial_first
         self.aggregator = self.set_aggregator(sampler, output_size, output, weights, softmax_dim)
 
     def set_aggregator(self, sampler, output_size, output, weights, softmax_dim):
@@ -19,10 +20,10 @@ class Aggregator:
         chunk_size = sampler.chunk_size
         if mode.startswith('sample_') and chunk_size is None:
             sampler = _Aggregator(spatial_size=sampler.spatial_size, patch_size=sampler.patch_size, output_size=output_size,
-                                  output=output, weights=weights, spatial_first=sampler.spatial_first, softmax_dim=softmax_dim)
+                                  output=output, weights=weights, spatial_first=self.spatial_first, softmax_dim=softmax_dim)
         elif mode.startswith('sample_') and chunk_size is not None:
             sampler = _ChunkAggregator(spatial_size=sampler.spatial_size, patch_size=sampler.patch_size, patch_overlap=sampler.patch_overlap, chunk_size=sampler.chunk_size,
-                                       output_size=output_size, output=output, weights=weights, spatial_first=sampler.spatial_first, softmax_dim=softmax_dim)
+                                       output_size=output_size, output=output, weights=weights, spatial_first=self.spatial_first, softmax_dim=softmax_dim)
         elif mode.startswith('pad_') and chunk_size is None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(mode))
         elif mode.startswith('pad_') and chunk_size is not None:
@@ -49,7 +50,7 @@ class Aggregator:
 
 class _Aggregator:
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], output_size: Optional[Union[Tuple, npt.ArrayLike]] = None,
-                 output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True, softmax_dim: Optional[int] = None):
+                 output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: bool = True, softmax_dim: Optional[int] = None):
         """
         Aggregator to assemble an image with continuous content from patches. The content of overlapping patches is averaged.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
@@ -192,7 +193,7 @@ class _Aggregator:
 
 class _ChunkAggregator(_Aggregator):
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Union[Tuple, npt.ArrayLike], chunk_size: Union[Tuple, npt.ArrayLike],
-                 output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: str = True,
+                 output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, weights: Union[str, Callable] = 'avg', spatial_first: bool = True,
                  softmax_dim: Optional[int] = None, mode: str = 'sample_edge'):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.

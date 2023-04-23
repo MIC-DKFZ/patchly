@@ -116,36 +116,40 @@ class TestChunkGridAggregator(unittest.TestCase):
         chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((3, *spatial_size))
-        spatial_first = False
+        spatial_first_sampler = False
+        spatial_first_aggregator = False
 
-        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first_sampler=spatial_first_sampler, spatial_first_aggregator=spatial_first_aggregator)
 
     def test_channel_last(self):
         patch_size = (10, 10)
         chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((*spatial_size, 5))
-        spatial_first = True
+        spatial_first_sampler = True
+        spatial_first_aggregator = True
 
-        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first_sampler=spatial_first_sampler, spatial_first_aggregator=spatial_first_aggregator)
 
     def test_batch_and_channel_dim(self):
         patch_size = (10, 10)
         chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((4, 3, *spatial_size))
-        spatial_first = False
+        spatial_first_sampler = False
+        spatial_first_aggregator = False
 
-        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first_sampler=spatial_first_sampler, spatial_first_aggregator=spatial_first_aggregator)
 
     def test_multiple_non_spatial_dims(self):
         patch_size = (10, 10)
         chunk_size = (50, 50)
         spatial_size = (100, 100)
         image = np.random.random((5, 4, 3, *spatial_size))
-        spatial_first = False
+        spatial_first_sampler = False
+        spatial_first_aggregator = False
 
-        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first=spatial_first)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first_sampler=spatial_first_sampler, spatial_first_aggregator=spatial_first_aggregator)
 
     def test_zarr(self):
         patch_size = (10, 10)
@@ -196,10 +200,10 @@ class TestChunkGridAggregator(unittest.TestCase):
     #
     #     self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, mode="sample_edge")
 
-    def _test_aggregator(self, image, spatial_size, patch_size, chunk_size, patch_overlap=None, spatial_first=True, output=None, weights='avg', multiply_elements_by_two=False):
+    def _test_aggregator(self, image, spatial_size, patch_size, chunk_size, patch_overlap=None, spatial_first_sampler=True, spatial_first_aggregator=True, output=None, weights='avg', multiply_elements_by_two=False):
         # Test with output size
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first, mode="sample_edge")
-        aggregator = Aggregator(sampler=sampler, output_size=image.shape, weights=weights)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first_sampler, mode="sample_edge")
+        aggregator = Aggregator(sampler=sampler, output_size=image.shape, weights=weights, spatial_first=spatial_first_aggregator)
 
         for i, (patch, patch_indices, chunk_id) in enumerate(sampler):
             if multiply_elements_by_two:
@@ -216,8 +220,8 @@ class TestChunkGridAggregator(unittest.TestCase):
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first, mode="sample_edge")
-        aggregator = Aggregator(sampler=sampler, output=output, weights=weights)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first_sampler, mode="sample_edge")
+        aggregator = Aggregator(sampler=sampler, output=output, weights=weights, spatial_first=spatial_first_aggregator)
 
         for i, (patch, patch_indices, chunk_id) in enumerate(sampler):
             if multiply_elements_by_two:

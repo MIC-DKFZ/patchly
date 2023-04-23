@@ -12,7 +12,7 @@ def example():
     """
     # Init image
     image = np.random.random((3, 1000, 1000))  # Channel, Width, Height
-    spatial_size=image.shape[-2:]
+    spatial_size = image.shape[-2:]
     patch_size = (100, 100)
     patch_overlap = (50, 50)
     chunk_size = (500, 500)
@@ -26,7 +26,7 @@ def example():
     # Create an empty prediction passed to the aggregator
     prediction = np.zeros(spatial_size, dtype=np.uint8)
     # Init aggregator
-    aggregator = Aggregator(sampler=sampler, output=prediction, weights='gaussian', softmax_dim=0)
+    aggregator = Aggregator(sampler=sampler, output=prediction, weights='gaussian', softmax_dim=1)
 
     # Run inference
     with torch.no_grad():

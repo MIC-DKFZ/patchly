@@ -1,13 +1,13 @@
 # Samplify
 
-Samplify is a grid sampler for N-dimensional images enabling inference of extremely large images. Especially for 3D images, it has been proven successfully to inference large images patch-wise in a sliding-window approach. Samplify does just that with a very simple interface to sample and aggregate images.
+Samplify is a grid sampler for N-dimensional images enabling inference and other processing steps on extremely large images. Especially for 3D images, it has been proven successfully to inference large images patch-wise in a sliding-window approach. Samplify does just that with a very simple interface to sample and aggregate images.
 
 ## Features
 
 Samplify supports:
-- N-dimensional images (2D, 3D, ...)
+- N-dimensional images (1D, 2D, 3D, ...)
 - Sampling and aggregation of images
-- Any array-like images
+- Any array-like images (Numpy, Tensor, Zarr, Dask, ...)
 - Memory-mapped images
 - Patch overlap
 - All numpy padding techniques

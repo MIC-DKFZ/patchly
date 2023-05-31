@@ -16,9 +16,24 @@ Samplify supports:
 
 ## Installation
 
-You can install `samplify` via [pip]:
+<!-- You can install `samplify` via [pip]:
 
-    pip install samplify
+    pip install samplify -->
+
+To install Samplify, you'll first need to clone the repository to your local machine.
+
+1. Open your terminal and clone the repository:
+    ```cmd
+    git clone https://github.com/MIC-DKFZ/samplify.git
+    ```
+2. Navigate into the cloned repository:
+    ```cmd
+    cd samplify
+    ```
+3. Install the project using pip:
+    ```cmd
+    pip install .
+    ```
 
 ## Usage
 

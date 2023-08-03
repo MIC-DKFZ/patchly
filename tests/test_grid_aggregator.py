@@ -232,16 +232,6 @@ class TestGridAggregator(unittest.TestCase):
         gaussian_weights[gaussian_weights == 0] = np.min(gaussian_weights[gaussian_weights != 0])
         return gaussian_weights
 
-    def add_non_spatial_indices(self, image, spatial_size, patch_indices, spatial_first):
-        non_image_dims = len(image.shape) - len(spatial_size)
-        if spatial_first:
-            slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([[None]] * non_image_dims)
-        else:
-            slices = [[None]] * non_image_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        return slices
-
 
 if __name__ == '__main__':
     unittest.main()

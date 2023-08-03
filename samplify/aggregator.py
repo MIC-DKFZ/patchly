@@ -1,6 +1,7 @@
 import numpy as np
 from samplify.sampler import GridSampler, _EdgeGridSampler
 from samplify.slicer import slicer
+from samplify import utils
 from scipy.ndimage.filters import gaussian_filter
 from collections import defaultdict
 import copy
@@ -118,7 +119,7 @@ class _Aggregator:
         """
         if self.computed_inplace:
             raise RuntimeError("get_output() has already been called with inplace=True. Therefore, no further patches can be appended.")
-        slices = self.add_non_spatial_indices(self.output, patch_indices)
+        slices = utils.add_non_spatial_indices(self.output, patch_indices, self.spatial_size, self.spatial_first)
         self.output[slicer(self.output, slices)] += patch.astype(self.output.dtype) * self.weight_patch.astype(self.output.dtype)
         if self.weight_map is not None:
             weight_map_patch = self.weight_map[slicer(self.weight_map, slices)]  # weight_map_patch is only a reference to a patch in self.weight_map
@@ -167,16 +168,6 @@ class _Aggregator:
             return data_size_a
         else:
             return spatial_data_size_a
-
-    def add_non_spatial_indices(self, output, patch_indices):
-        non_spatial_dims = len(output.shape) - len(self.spatial_size)
-        if self.spatial_first:
-            slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([[None]] * non_spatial_dims)
-        else:
-            slices = [[None]] * non_spatial_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        return slices
 
     def broadcast_to(self, data, target_shape):
         if self.spatial_first:
@@ -261,7 +252,7 @@ class _ChunkAggregator(_Aggregator):
                 patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], unhashed_keys))
         self.chunk_patches_dicts[chunk_id][patch_indices_key] = patch
         # if self.weight_map is not None:
-        #     slices = self.add_non_spatial_indices(self.output, patch_indices)
+        #     slices = utils.add_non_spatial_indices(self.output, patch_indices, self.spatial_size, self.spatial_first)
         #     weight_map_patch = self.weight_map[slicer(self.weight_map, slices)]  # weight_map_patch is only a reference to a patch in self.weight_map
         #     weight_map_patch[...] += self.weight_patch  # Adds patch to the map. [...] enables the use of memory-mapped array-like data
         if self.is_chunk_complete(chunk_id):
@@ -288,10 +279,10 @@ class _ChunkAggregator(_Aggregator):
         for patch_indices_key, patch in self.chunk_patches_dicts[chunk_id].items():
             patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
             patch_indices -= sampler_offset
-            slices = self.add_non_spatial_indices(chunk, patch_indices)
+            slices = utils.add_non_spatial_indices(chunk, patch_indices, self.spatial_size, self.spatial_first)
             chunk[slicer(chunk, slices)] += patch.astype(chunk.dtype) * self.weight_patch.astype(chunk.dtype)
             if self.weight_map is not None:
-                slices = self.add_non_spatial_indices(self.output, patch_indices)
+                slices = utils.add_non_spatial_indices(self.output, patch_indices, self.spatial_size, self.spatial_first)
                 self.weight_map[slicer(self.weight_map, slices)] += self.weight_patch
         if self.weight_map is not None:
             chunk = chunk / self.weight_map.astype(chunk.dtype)
@@ -301,11 +292,11 @@ class _ChunkAggregator(_Aggregator):
             chunk = chunk.argmax(axis=self.softmax_dim).astype(np.uint16)
         # Crop the chunk
         crop_indices = self.chunk_indices[chunk_id] - sampler_offset
-        crop_indices = self.add_non_spatial_indices(chunk, crop_indices)
+        crop_indices = utils.add_non_spatial_indices(chunk, crop_indices, self.spatial_size, self.spatial_first)
         chunk = chunk[slicer(chunk, crop_indices)]
         # Write the chunk into the global output
         crop_indices = self.chunk_indices[chunk_id]
-        crop_indices = self.add_non_spatial_indices(self.output, crop_indices)
+        crop_indices = utils.add_non_spatial_indices(self.output, crop_indices, self.spatial_size, self.spatial_first)
         self.output[slicer(self.output, crop_indices)] = chunk
         # Set all self.chunk_patches_dicts[chunk_id] values to None
         for key in self.chunk_patches_dicts[chunk_id].keys():

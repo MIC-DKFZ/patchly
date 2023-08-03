@@ -1,5 +1,6 @@
 import numpy as np
 from samplify.slicer import slicer
+from samplify import utils
 import copy
 import random
 # import augmentify as aug
@@ -204,27 +205,17 @@ class _CropGridSampler:
 
     def slice_patch(self, patch_indices):
         if self.image is not None and not isinstance(self.image, dict):
-            slices = self.add_non_spatial_indices(self.image, patch_indices)
+            slices = utils.add_non_spatial_indices(self.image, patch_indices, self.spatial_size, self.spatial_first)
             patch = self.image[slicer(self.image, slices)]
             return patch, patch_indices
         elif self.image is not None and isinstance(self.image, dict):
             patch_dict = {}
             for key in self.image.keys():
-                slices = self.add_non_spatial_indices(self.image[key], patch_indices)
+                slices = utils.add_non_spatial_indices(self.image[key], patch_indices, self.spatial_size, self.spatial_first)
                 patch_dict[key] = self.image[key][slicer(self.image[key], slices)]
             return patch_dict, patch_indices
         else:
             return patch_indices
-
-    def add_non_spatial_indices(self, image, patch_indices):
-        non_spatial_dims = len(image.shape) - len(self.spatial_size)
-        if self.spatial_first:
-            slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([[None]] * non_spatial_dims)
-        else:
-            slices = [[None]] * non_spatial_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        return slices
 
 
 class _EdgeGridSampler(_CropGridSampler):

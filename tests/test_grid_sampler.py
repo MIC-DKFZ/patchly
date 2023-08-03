@@ -3,6 +3,7 @@ import numpy as np
 import zarr
 from samplify.sampler import GridSampler
 from samplify.slicer import slicer
+from samplify import utils
 
 
 class TestGridSampler(unittest.TestCase):
@@ -170,7 +171,7 @@ class TestGridSampler(unittest.TestCase):
                 _patch_size = patch.shape[:len(patch_size)]
             self.assertEqual(_patch_size, patch_size, "patch.shape: {}, patch_size: {}, patch indices: {}".format(patch.shape, patch_size, patch_indices))
             result[slicer(result, patch_indices)] = 1
-            patch_indices = self.add_non_spatial_indices(image, spatial_size, patch_indices, spatial_first)
+            patch_indices = utils.add_non_spatial_indices(image, patch_indices, spatial_size, spatial_first)
             np.testing.assert_array_equal(patch, image[slicer(image, patch_indices)], err_msg="image shape: {}, patch shape: {}, patch indices: {}".format(image.shape, patch.shape, patch_indices))
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
@@ -187,16 +188,6 @@ class TestGridSampler(unittest.TestCase):
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
             np.sum(result), result.size, result.shape, image.shape, patch_size, patch_size
         ))
-
-    def add_non_spatial_indices(self, image, spatial_size, patch_indices, spatial_first):
-        non_image_dims = len(image.shape) - len(spatial_size)
-        if spatial_first:
-            slices = [index_pair.tolist() for index_pair in patch_indices]
-            slices.extend([[None]] * non_image_dims)
-        else:
-            slices = [[None]] * non_image_dims
-            slices.extend([index_pair.tolist() for index_pair in patch_indices])
-        return slices
 
 
 if __name__ == '__main__':

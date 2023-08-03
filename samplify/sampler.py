@@ -77,6 +77,8 @@ class GridSampler:
         return sampler
 
     def check_sanity(self):
+        if self.image is not None and not hasattr(self.image, '__getitem__'):
+            raise RuntimeError("The given image is not ArrayLike.")
         if self.spatial_first and self.image is not None and (self.image.shape[:len(self.spatial_size)] != tuple(self.spatial_size)):
             raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image.shape[:len(self.spatial_size)], self.spatial_size))
         if (not self.spatial_first) and self.image is not None and (self.image.shape[-len(self.spatial_size):] != tuple(self.spatial_size)):

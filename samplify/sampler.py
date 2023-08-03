@@ -55,27 +55,6 @@ class GridSampler:
             parameter = np.asarray(parameter)
         return parameter
 
-    def create_sampler(self):
-        if self.mode == "sample_edge" and self.chunk_size is None:
-            sampler = _EdgeGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
-        elif self.mode == "sample_edge" and self.chunk_size is not None:
-            sampler = _ChunkGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
-                                        spatial_first=self.spatial_first)
-        elif self.mode == "sample_adaptive" and self.chunk_size is None:
-            sampler = _AdaptiveGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
-        elif self.mode == "sample_adaptive" and self.chunk_size is not None:
-            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        elif self.mode == "sample_crop" and self.chunk_size is None:
-            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
-        elif self.mode == "sample_crop" and self.chunk_size is not None:
-            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        elif self.mode.startswith('pad_'):
-            self.pad_image()
-            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
-        else:
-            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        return sampler
-
     def check_sanity(self):
         if self.image is not None and not hasattr(self.image, '__getitem__'):
             raise RuntimeError("The given image is not ArrayLike.")
@@ -108,6 +87,27 @@ class GridSampler:
             raise RuntimeError("The given sampling mode ({}) requires the image to be given and as type np.ndarray.".format(self.mode))
         if self.mode.startswith('pad_') and self.chunk_size is not None:
             raise RuntimeError("The given sampling mode ({}) is not compatible with chunk sampling.".format(self.mode))
+        
+    def create_sampler(self):
+        if self.mode == "sample_edge" and self.chunk_size is None:
+            sampler = _EdgeGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
+        elif self.mode == "sample_edge" and self.chunk_size is not None:
+            sampler = _ChunkGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
+                                        spatial_first=self.spatial_first)
+        elif self.mode == "sample_adaptive" and self.chunk_size is None:
+            sampler = _AdaptiveGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
+        elif self.mode == "sample_adaptive" and self.chunk_size is not None:
+            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
+        elif self.mode == "sample_crop" and self.chunk_size is None:
+            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
+        elif self.mode == "sample_crop" and self.chunk_size is not None:
+            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
+        elif self.mode.startswith('pad_'):
+            self.pad_image()
+            sampler = _CropGridSampler(image=self.image, spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, spatial_first=self.spatial_first)
+        else:
+            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
+        return sampler
 
     def pad_image(self):
         if self.mode.startswith('pad_end_'):

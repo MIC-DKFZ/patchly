@@ -140,7 +140,6 @@ class TestGridSampler(unittest.TestCase):
         patch_size = (101, 100)
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
-        image = zarr.array(image)
 
         self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode="sample_edge")
 

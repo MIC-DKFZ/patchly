@@ -116,7 +116,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         patch_size = (10, 10)
         spatial_size = (100, 100)
         image = np.random.random((4, 3, *spatial_size))
-        spatial_first = True
+        spatial_first = False
 
         self._test_sampler(image, spatial_size, patch_size, spatial_first=spatial_first)
 

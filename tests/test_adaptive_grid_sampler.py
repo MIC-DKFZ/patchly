@@ -152,6 +152,13 @@ class TestAdaptiveGridSampler(unittest.TestCase):
 
         self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, mode="sample_adaptive")
 
+    def test_spatial_size_unequal_to_spatial_image_size(self):
+        patch_size = (10, 10)
+        spatial_size = (100, 100)
+        image = np.random.random((200, 200))
+
+        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode="sample_adaptive")
+
     def _test_sampler(self, image, spatial_size, patch_size, patch_overlap=None, spatial_first=True):
         # Test with image
         result = np.zeros_like(image)

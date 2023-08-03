@@ -76,7 +76,10 @@ class GridSampler:
         return sampler
 
     def check_sanity(self):
-        # TODO: Check spatial_size == image.shape. Consider non-spatial dims and spatial_first
+        if self.spatial_first and self.image is not None and (self.image.shape[:len(self.spatial_size)] != tuple(self.spatial_size)):
+            raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image.shape[:len(self.spatial_size)], self.spatial_size))
+        if (not self.spatial_first) and self.image is not None and (self.image.shape[-len(self.spatial_size):] != tuple(self.spatial_size)):
+            raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image.shape[-len(self.spatial_size):], self.spatial_size))
         if np.any(self.patch_size > self.spatial_size):
             raise RuntimeError("The patch size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.patch_size, self.spatial_size))
         if self.patch_overlap is not None and np.any(self.patch_overlap > self.patch_size):

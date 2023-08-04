@@ -207,7 +207,7 @@ class _ChunkAggregator(_Aggregator):
         self.patch_overlap = patch_overlap
         self.chunk_size = chunk_size
         self.chunk_dtype = self.set_chunk_dtype()
-        self.weight_patch, self.weight_map = self.set_weights(weights, self.chunk_size)
+        self.weight_patch, _ = self.set_weights(weights, self.chunk_size)
         self.mode = mode
         self.compute_indices()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
@@ -255,14 +255,10 @@ class _ChunkAggregator(_Aggregator):
             raise RuntimeError("patch_indices_key not in self.chunk_patches_dicts[chunk_id]! patch_indices: {}. Offset for chunk_id {} is{}. unhashed_keys: {}".format(
                 patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], self.chunk_patches_dicts[chunk_id].keys()))
         self.chunk_patches_dicts[chunk_id][str(patch_indices)]["patch"] = patch
-        # if self.weight_map is not None:
-        #     slices = utils.add_non_spatial_indices(self.output, patch_indices, self.spatial_size, self.spatial_first)
-        #     weight_map_patch = self.weight_map[slicer(self.weight_map, slices)]  # weight_map_patch is only a reference to a patch in self.weight_map
-        #     weight_map_patch[...] += self.weight_patch  # Adds patch to the map. [...] enables the use of memory-mapped array-like data
         if self.is_chunk_complete(chunk_id):
             # print("chunk_id: ", chunk_id)
-            self.process_chunk(chunk_id)
-            # self.executor.submit(self.process_chunk, chunk_id)
+            # self.process_chunk(chunk_id)
+            self.executor.submit(self.process_chunk, chunk_id)
 
     def is_chunk_complete(self, chunk_id):
         # Check if all self.chunk_patches_dicts[chunk_id] values are not None
@@ -278,18 +274,18 @@ class _ChunkAggregator(_Aggregator):
         chunk = np.zeros(chunk_size, dtype=self.chunk_dtype)
         # Weight each patch during insertion
         sampler_offset = self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
-        if self.weight_map is not None:
-            self.weight_map.fill(0.)
+        if self.softmax_dim is None:
+            weight_map = np.zeros(chunk_size)
         for patch_dict in self.chunk_patches_dicts[chunk_id].values():
             image_patch_indices, patch = patch_dict["patch_indices"], patch_dict["patch"]
             chunk_patch_indices = image_patch_indices - sampler_offset
             slices = utils.add_non_spatial_indices(chunk, chunk_patch_indices, self.spatial_size, self.spatial_first)
             chunk[slicer(chunk, slices)] += patch.astype(chunk.dtype) * self.weight_patch.astype(chunk.dtype)
-            if self.weight_map is not None:
+            if self.softmax_dim is None:
                 slices = utils.add_non_spatial_indices(self.output, chunk_patch_indices, self.spatial_size, self.spatial_first)
-                self.weight_map[slicer(self.weight_map, slices)] += self.weight_patch
-        if self.weight_map is not None:
-            chunk = chunk / self.weight_map.astype(chunk.dtype)
+                weight_map[slicer(weight_map, slices)] += self.weight_patch
+        if self.softmax_dim is None:
+            chunk = chunk / weight_map.astype(chunk.dtype)
             chunk = np.nan_to_num(chunk)
         if self.softmax_dim is not None:
             # Argmax the softmax chunk

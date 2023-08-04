@@ -239,10 +239,9 @@ class _ChunkAggregator(_Aggregator):
                 if chunk_indices[axis][1] < self.spatial_size[axis]:
                     chunk_indices[axis][1] -= int(self.patch_size[axis] // 2)
 
-            for patch_indices in sampler:
-                patch_indices_key = patch_indices + sampler_offset.reshape(-1, 1)
-                patch_indices_key = patch_indices_key.astype(np.int64).tobytes()
-                self.chunk_patches_dicts[chunk_id][patch_indices_key] = None
+            for chunk_patch_indices in sampler:
+                image_patch_indices = chunk_patch_indices + sampler_offset.reshape(-1, 1)
+                self.chunk_patches_dicts[chunk_id][str(image_patch_indices)] = {"patch_indices": image_patch_indices, "patch": None}
 
     def append(self, patch, patch_indices, chunk_id):
         """
@@ -252,12 +251,10 @@ class _ChunkAggregator(_Aggregator):
         """
         if chunk_id is None:
             raise RuntimeError("The chunk ID must be given when the chunk size is set.")
-        patch_indices_key = patch_indices.astype(np.int64).tobytes()
-        if patch_indices_key not in self.chunk_patches_dicts[chunk_id]:
-            unhashed_keys = [np.array(np.frombuffer(key, dtype=np.int64), dtype=int).reshape(-1, 2) for key in self.chunk_patches_dicts[chunk_id].keys()]
+        if str(patch_indices) not in self.chunk_patches_dicts[chunk_id]:
             raise RuntimeError("patch_indices_key not in self.chunk_patches_dicts[chunk_id]! patch_indices: {}. Offset for chunk_id {} is{}. unhashed_keys: {}".format(
-                patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], unhashed_keys))
-        self.chunk_patches_dicts[chunk_id][patch_indices_key] = patch
+                patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], self.chunk_patches_dicts[chunk_id].keys()))
+        self.chunk_patches_dicts[chunk_id][str(patch_indices)]["patch"] = patch
         # if self.weight_map is not None:
         #     slices = utils.add_non_spatial_indices(self.output, patch_indices, self.spatial_size, self.spatial_first)
         #     weight_map_patch = self.weight_map[slicer(self.weight_map, slices)]  # weight_map_patch is only a reference to a patch in self.weight_map
@@ -270,26 +267,26 @@ class _ChunkAggregator(_Aggregator):
     def is_chunk_complete(self, chunk_id):
         # Check if all self.chunk_patches_dicts[chunk_id] values are not None
         for value in self.chunk_patches_dicts[chunk_id].values():
-            if value is None:
+            if value["patch"] is None:
                 return False
         return True
 
     def process_chunk(self, chunk_id):
         # If they are all not None, create a softmax array of size chunk_size with number classes as channels
-        patch_shape = self.chunk_patches_dicts[chunk_id][list(self.chunk_patches_dicts[chunk_id].keys())[0]].shape
+        patch_shape = list(self.chunk_patches_dicts[chunk_id].values())[0]["patch"].shape
         chunk_size = self.add_non_spatial_dims(self.chunk_size, patch_shape)
         chunk = np.zeros(chunk_size, dtype=self.chunk_dtype)
         # Weight each patch during insertion
         sampler_offset = self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
         if self.weight_map is not None:
             self.weight_map.fill(0.)
-        for patch_indices_key, patch in self.chunk_patches_dicts[chunk_id].items():
-            patch_indices = np.array(np.frombuffer(patch_indices_key, dtype=np.int64), dtype=int).reshape(-1, 2)
-            patch_indices -= sampler_offset
-            slices = utils.add_non_spatial_indices(chunk, patch_indices, self.spatial_size, self.spatial_first)
+        for patch_dict in self.chunk_patches_dicts[chunk_id].values():
+            image_patch_indices, patch = patch_dict["patch_indices"], patch_dict["patch"]
+            chunk_patch_indices = image_patch_indices - sampler_offset
+            slices = utils.add_non_spatial_indices(chunk, chunk_patch_indices, self.spatial_size, self.spatial_first)
             chunk[slicer(chunk, slices)] += patch.astype(chunk.dtype) * self.weight_patch.astype(chunk.dtype)
             if self.weight_map is not None:
-                slices = utils.add_non_spatial_indices(self.output, patch_indices, self.spatial_size, self.spatial_first)
+                slices = utils.add_non_spatial_indices(self.output, chunk_patch_indices, self.spatial_size, self.spatial_first)
                 self.weight_map[slicer(self.weight_map, slices)] += self.weight_patch
         if self.weight_map is not None:
             chunk = chunk / self.weight_map.astype(chunk.dtype)
@@ -307,8 +304,7 @@ class _ChunkAggregator(_Aggregator):
         self.output[slicer(self.output, crop_indices)] = chunk
         # Set all self.chunk_patches_dicts[chunk_id] values to None
         for key in self.chunk_patches_dicts[chunk_id].keys():
-            self.chunk_patches_dicts[chunk_id][key] = None
-        # print("Finished saving chunk ", chunk_id, flush=True)
+            self.chunk_patches_dicts[chunk_id][key]["patch"] = None
 
     def get_output(self, inplace: bool = False):
         self.executor.shutdown(wait=True)

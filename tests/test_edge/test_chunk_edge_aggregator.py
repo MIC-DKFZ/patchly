@@ -8,7 +8,7 @@ from scipy.ndimage.filters import gaussian_filter
 import copy
 
 
-class TestChunkGridAggregator(unittest.TestCase):
+class TestChunkEdgeAggregator(unittest.TestCase):
     def test_without_overlap_without_remainder_2d(self):
         patch_size = (10, 10)
         spatial_size = (100, 100)

@@ -267,7 +267,7 @@ class _ChunkAggregator(_Aggregator):
         if self.softmax_dim is None:
             chunk = chunk / weight_map.astype(chunk.dtype)
             chunk = np.nan_to_num(chunk)
-        if self.softmax_dim is not None:
+        else:
             # Argmax the softmax chunk
             chunk = chunk.argmax(axis=self.softmax_dim).astype(np.uint16)
         # Crop the chunk
@@ -277,7 +277,7 @@ class _ChunkAggregator(_Aggregator):
         # Write the chunk into the global output
         crop_indices = self.chunk_indices[chunk_id]
         crop_indices = utils.add_non_spatial_indices(self.output, crop_indices, self.spatial_size, self.spatial_first)
-        self.output[slicer(self.output, crop_indices)] = chunk
+        self.output[slicer(self.output, crop_indices)] = chunk.astype(self.output.dtype)
         # Set all self.chunk_patches_dicts[chunk_id] values to None
         for key in self.chunk_patches_dicts[chunk_id].keys():
             self.chunk_patches_dicts[chunk_id][key]["patch"] = None

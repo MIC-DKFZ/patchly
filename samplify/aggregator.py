@@ -72,8 +72,6 @@ class Aggregator:
         return gaussian_weights
 
     def check_sanity(self):
-        if self.softmax_dim is not None and not issubclass(type(self), _ChunkAggregator):
-            raise NotImplementedError("Softmax reduction is not supported on unchunked images.")
         if not hasattr(self.output, '__getitem__'):
             raise RuntimeError("The given output is not ArrayLike.")
         if self.spatial_first and (self.output.shape[:len(self.spatial_size)] != tuple(self.spatial_size)):
@@ -164,7 +162,8 @@ class _Aggregator:
                 output[...] = output / self.weight_map.astype(output.dtype)
                 output[...] = np.nan_to_num(output)
             if self.softmax_dim is not None:
-                output[...] = output.argmax(axis=self.softmax_dim)
+                # Cannot be done inplace -> No [...]
+                output = output.argmax(axis=self.softmax_dim)
             if inplace:
                 self.computed_inplace = True
         return output

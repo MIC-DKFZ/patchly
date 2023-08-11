@@ -41,6 +41,15 @@ class TestChunkGridSampler(unittest.TestCase):
 
         self._test_sampler(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
 
+    def test_with_overlap_with_remainder_2d_v2(self):
+        patch_overlap = (3, 3)
+        patch_size = (10, 10)
+        spatial_size = (103, 107)
+        chunk_size = (40, 40)
+        image = np.random.random(spatial_size)
+
+        self.assertRaises(RuntimeError, self._test_sampler, image=image, spatial_size=spatial_size, patch_size=patch_size, chunk_size=chunk_size, patch_overlap=patch_overlap)
+
     def test_without_overlap_without_remainder_3d(self):
         patch_size = (10, 10, 5)
         spatial_size = (100, 100, 50)

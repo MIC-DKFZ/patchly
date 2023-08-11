@@ -37,6 +37,14 @@ class TestGridSampler(unittest.TestCase):
 
         self._test_sampler(image, spatial_size, patch_size, patch_overlap)
 
+    def test_with_overlap_with_remainder_2d_v2(self):
+        patch_overlap = (3, 3)
+        patch_size = (10, 10)
+        spatial_size = (103, 107)
+        image = np.random.random(spatial_size)
+
+        self._test_sampler(image, spatial_size, patch_size, patch_overlap)
+
     def test_without_overlap_without_remainder_3d(self):
         patch_size = (10, 10, 5)
         spatial_size = (100, 100, 50)

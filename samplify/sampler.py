@@ -194,8 +194,8 @@ class _CropGridSampler:
         for axis in range(len(indices)):
             patch_indices[axis][0] = indices[axis]
             patch_indices[axis][1] = indices[axis] + self.patch_size[axis]
-        slice_result = self.slice_patch(patch_indices)
-        return slice_result
+        patch_result = self.get_patch_result(patch_indices)
+        return patch_result
 
     def __next__(self):
         if self.index < self.__len__():
@@ -205,7 +205,7 @@ class _CropGridSampler:
         else:
             raise StopIteration
 
-    def slice_patch(self, patch_indices):
+    def get_patch_result(self, patch_indices):
         if self.image is not None and not isinstance(self.image, dict):
             slices = utils.add_non_spatial_indices(self.image, patch_indices, self.spatial_size, self.spatial_first)
             patch = self.image[slicer(self.image, slices)]
@@ -281,8 +281,8 @@ class _AdaptiveGridSampler(_CropGridSampler):
         for axis in range(len(indices)):
             patch_indices[axis][0] = indices[axis]
             patch_indices[axis][1] = min(indices[axis] + self.patch_size[axis], self.spatial_size[axis])
-        slice_result = self.slice_patch(patch_indices)
-        return slice_result
+        patch_result = self.get_patch_result(patch_indices)
+        return patch_result
 
 
 class _ChunkGridSampler(_CropGridSampler):
@@ -326,307 +326,9 @@ class _ChunkGridSampler(_CropGridSampler):
         patch_indices = copy.copy(self.chunk_sampler[chunk_id].__getitem__(patch_id))
         patch_indices += self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
 
-        slice_result = self.slice_patch(patch_indices)
+        patch_result = self.get_patch_result(patch_indices)
         if self.image is None:
-            slice_result = slice_result, chunk_id
+            patch_result = patch_result, chunk_id
         else:
-            slice_result = *slice_result, chunk_id
-        return slice_result
-
-
-# class ResizeSampler(Dataset):
-#     def __init__(self, sampler, target_size, image_size=None, patch_size=None, patch_overlap=None, mode='edge'):
-#         self.sampler = sampler
-#         self.target_size = target_size
-#         self.mode = mode
-#         # self.size_conversion_factor = size_conversion_factor
-#         # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
-#         # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
-#         self.resized_sampler = _EdgeGridSampler(spatial_size=image_size, patch_size=patch_size,
-#                                                 patch_overlap=patch_overlap)
-#         self.sanity_check()
-#
-#     def sanity_check(self):
-#         if len(self.sampler) != len(self.resized_sampler):
-#             raise RuntimeError("Lengths of sampler ({}) and resized_sampler ({}) do not match.".format(self.sampler.cumsum_length[-1], self.resized_sampler.length[-1]))
-#
-#     def __getitem__(self, idx):
-#         output = self.sampler.__getitem__(idx)
-#         resized_patch_indices = self.resized_sampler.__getitem__(idx)
-#         if len(output) == 2 and not isinstance(output[0], dict):
-#             patch, patch_indices = output
-#             patch = ski_transform.resize(patch, output_shape=self.target_size, order=1, mode=self.mode)
-#             # patch_indices = self.resize_indices(patch_indices)
-#             return patch, resized_patch_indices
-#         elif len(output) == 2 and isinstance(output[0], dict):
-#             patch_dict, patch_indices = output
-#             for key in patch_dict.keys():
-#                 patch_dict[key] = ski_transform.resize(patch_dict[key], output_shape=self.target_size, order=1, mode=self.mode)
-#             # patch_indices = self.resize_indices(patch_indices)
-#             return patch_dict, resized_patch_indices
-#         else:
-#             patch_indices = output
-#             # patch_indices = self.resize_indices(patch_indices)
-#             return resized_patch_indices
-#
-#     # def resize_indices(self, patch_indices):
-#     #     patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int64)
-#     #     return patch_indices
-#
-#     def __len__(self):
-#         return len(self.sampler)
-#
-#
-# class ChunkedResizeSampler(Dataset):
-#     def __init__(self, sampler, target_size, image_size=None, patch_size=None, patch_overlap=None, chunk_size=None, mode='edge'):
-#         self.sampler = sampler
-#         self.target_size = target_size
-#         self.mode = mode
-#         # self.size_conversion_factor = size_conversion_factor
-#         # Required due to otherwise shitty rounding errors in resize_indices()  # Still leads to rounding errors...
-#         # self.size_conversion_factor = np.floor(np.max(self.sampler.chunk_sampler_offset[1]) * size_conversion_factor) / np.max(self.sampler.chunk_sampler_offset[1])
-#         self.resized_sampler = _ChunkedGridSampler(spatial_size=image_size, patch_size=patch_size,
-#                                                    patch_overlap=patch_overlap, chunk_size=chunk_size)
-#         self.sanity_check()
-#
-#     def sanity_check(self):
-#         if self.sampler.cumsum_length[-1] != self.resized_sampler.cumsum_length[-1]:
-#             raise RuntimeError("Lengths of sampler ({}) and resized_sampler ({}) do not match.".format(self.sampler.cumsum_length[-1], self.resized_sampler.cumsum_length[-1]))
-#
-#     def __getitem__(self, idx):
-#         output = self.sampler.__getitem__(idx)
-#         resized_patch_indices = self.resized_sampler.__getitem__(idx)[0]
-#         if len(output) == 2 and not isinstance(output[0], dict):
-#             patch, (patch_indices, chunk_id) = output
-#             patch = ski_transform.resize(patch, output_shape=self.target_size, order=1, mode=self.mode)
-#             # patch_indices = self.resize_indices(patch_indices)
-#             return patch, (resized_patch_indices, chunk_id)
-#         elif len(output) == 2 and isinstance(output[0], dict):
-#             patch_dict, (patch_indices, chunk_id) = output
-#             for key in patch_dict.keys():
-#                 patch_dict[key] = ski_transform.resize(patch_dict[key], output_shape=self.target_size, order=1, mode=self.mode)
-#             # patch_indices = self.resize_indices(patch_indices)
-#             return patch_dict, (resized_patch_indices, chunk_id)
-#         else:
-#             (patch_indices, chunk_id) = output
-#             # patch_indices = self.resize_indices(patch_indices)
-#             return (resized_patch_indices, chunk_id)
-#
-#     # def resize_indices(self, patch_indices):
-#     #     patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int64)
-#     #     return patch_indices
-#
-#     def __len__(self):
-#         return len(self.sampler)
-
-
-# class SamplerDataset(Dataset):
-#     def __init__(self, sampler):
-#         self.sampler = sampler
-#
-#     def __getitem__(self, idx):
-#         output = self.sampler.__getitem__(idx)
-#         if len(output) == 2 and not isinstance(output[0], dict):
-#             patch, patch_indices = output
-#             patch = patch[np.newaxis, ...].astype(np.float32)
-#             return patch, patch_indices
-#         elif len(output) == 2 and isinstance(output[0], dict):
-#             patch_dict, patch_indices = output
-#             for key in patch_dict.keys():
-#                 patch_dict[key] = patch_dict[key][np.newaxis, ...].astype(np.float32)
-#             return patch_dict, patch_indices
-#         else:
-#             return output
-#
-#     def __len__(self):
-#         return len(self.sampler)
-
-
-# class GridSamplerDataset(GridSampler, Dataset):
-#     def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None):
-#         GridSampler.__init__(self, image, image_size, patch_size, patch_overlap)
-#
-#     def __getitem__(self, idx):
-#         output = GridSampler.__getitem__(self, idx)
-#         if len(output) == 2 and not isinstance(output[0], dict):
-#             patch, patch_indices = output
-#             patch = patch[np.newaxis, ...].astype(np.float32)
-#             return patch, patch_indices
-#         elif len(output) == 2 and isinstance(output[0], dict):
-#             patch_dict, patch_indices = output
-#             for key in patch_dict.keys():
-#                 patch_dict[key] = patch_dict[key][np.newaxis, ...].astype(np.float32)
-#             return patch_dict, patch_indices
-#         else:
-#             return output
-
-
-# class GridResamplerDataset(GridSamplerDataset):
-#     def __init__(self, image=None, image_size=None, patch_size=None, patch_overlap=None, target_size=None):
-#         """
-#         An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have overlap if patch_overlap is specified.
-#         If patch_size is not a multiple of image_size then the remainder part of the image is not padded, but instead patches are sampled at the edge of the image of size patch_size like this:
-#         ----------------------
-#         |                | X |
-#         |                | X |
-#         |                | X |
-#         |                | X |
-#         |----------------| X |
-#         |X  X  X  X  X  X  X |
-#         ----------------------
-#         The grid sampler only returns image patches if image is set.
-#         Otherwise, only the patch indices w_ini, w_fin, h_ini, h_fin, d_ini, d_fin are returned. They can be used to extract the patch from the image like this:
-#         img = img[w_ini:w_fin, h_ini:h_fin, d_ini:d_fin] (Example for a 3D image)
-#         Requiring only size parameters instead of the actual image makes the grid sampler file format independent if desired.
-#
-#         :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
-#         If None then patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
-#         :param image_size: The shape of the image without batch and channel dimensions. Always required.
-#         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
-#         :param patch_overlap: The shape of the patch overlap without batch and channel dimensions. If None then the patch overlap is equal to patch_size.
-#         :param target_size: The target size that should be used to resample the patch.
-#         """
-#         super().__init__(image, image_size, patch_size, patch_overlap)
-#         self.target_size = target_size
-#         self.size_conversion_factor = (self.target_size / self.patch_size)[0]
-#
-#     def __getitem__(self, idx):
-#         output = GridSampler.__getitem__(self, idx)
-#         if len(output) == 2 and not isinstance(output[0], dict):
-#             patch, patch_indices = output
-#             patch = ski_transform.resize(patch, output_shape=self.target_size, order=1)
-#             patch = patch[np.newaxis, ...].astype(np.float32)
-#             patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int32)
-#             return patch, patch_indices
-#         elif len(output) == 2 and isinstance(output[0], dict):
-#             patch_dict, patch_indices = output
-#             for key in patch_dict.keys():
-#                 patch = patch_dict[key]
-#                 patch = ski_transform.resize(patch, output_shape=self.target_size, order=1)
-#                 patch_dict[key] = patch[np.newaxis, ...].astype(np.float32)
-#             patch_indices = np.rint(patch_indices * self.size_conversion_factor).astype(np.int32)
-#             return patch_dict, patch_indices
-#         else:
-#             output = np.rint(output * self.size_conversion_factor).astype(np.int32)
-#             return output
-
-
-# class UniformSampler:
-#     def __init__(self, subjects, spatial_dims, patch_size, length, seed=None, channel_first=True):
-#         self.subjects = subjects
-#         self.spatial_dims = spatial_dims
-#         self.patch_size = np.asarray(patch_size)
-#         self.length = length
-#         self.channel_first = channel_first
-#         self.seeded_patches = self.seed_patches(seed)
-#
-#     def seed_patches(self, seed):
-#         if seed is None:
-#             return None
-#         else:
-#             np.random.seed(seed)
-#             seeded_patches = {}
-#             for idx in range(self.length):
-#                 subject_name, patch_indices, class_id = self.get_patch()
-#                 seeded_patches[idx] = {"subject_name": subject_name, "patch_indices": patch_indices, "class_id": class_id}
-#             np.random.seed()
-#             return seeded_patches
-#
-#     def __iter__(self):
-#         self.index = 0
-#         return self
-#
-#     def __len__(self):
-#         return self.length
-#
-#     def __getitem__(self, idx):
-#         if self.seeded_patches is None:
-#             subject_name, patch_indices, class_id = self.get_patch()
-#         else:
-#             subject_name = self.seeded_patches[idx]["subject_name"]
-#             patch_indices = self.seeded_patches[idx]["patch_indices"]
-#             class_id = self.seeded_patches[idx]["class_id"]
-#
-#         patch_dict = {}
-#         for key in self.subjects[subject_name].keys():
-#             slices = self.get_slices(self.subjects[subject_name][key], patch_indices)
-#             patch_dict[key] = self.subjects[subject_name][key][slicer(self.subjects[subject_name][key], slices)]
-#         patch_dict["patch_indices"] = patch_indices
-#         patch_dict["subject_name"] = subject_name
-#         # mask = patch_dict[aug.SEG] == class_id
-#         # has_class = np.max(mask) == 1
-#         # print("class: {}, has_class: {}".format(class_id, has_class))
-#         return patch_dict
-#
-#     def get_patch(self):
-#         subject_idx = random.randint(0, len(self.subjects) - 1)
-#         subject_name = self.subjects.index(subject_idx)
-#         pos = self.random_position(self.patch_size, self.subjects[subject_name][aug.IMAGE].shape[-self.spatial_dims:])
-#         patch_indices = np.stack((pos, pos + self.patch_size), axis=1)
-#         return subject_name, patch_indices, None
-#
-#     def __next__(self):
-#         if self.index < self.length:
-#             output = self.__getitem__(self.index)
-#             self.index += 1
-#             return output
-#         else:
-#             raise StopIteration
-#
-#     def get_slices(self, image, patch_indices):
-#         non_spatial_dims = len(image.shape) - self.spatial_dims
-#         if self.channel_first:
-#             slices = [None] * non_spatial_dims
-#             slices.extend([index_pair.tolist() for index_pair in patch_indices])
-#         else:
-#             slices = [index_pair.tolist() for index_pair in patch_indices]
-#             slices.extend([None] * non_spatial_dims)
-#         return slices
-#
-#     def random_position(self, patch_size, image_shape):
-#         pos = [random.randint(0, image_shape[axis] - patch_size[axis]) for axis in range(len(self.patch_size))]
-#         return pos
-#
-#
-# class WeightedSampler(UniformSampler):
-#     def __init__(self, subjects, spatial_dims, patch_size, length, population, class_weights=None, seed=None, channel_first=True):
-#         self.population = population
-#         self.class_weights = class_weights
-#         super().__init__(subjects, spatial_dims, patch_size, length, seed, channel_first)
-#
-#     def get_patch(self):
-#         position, subject_name, class_id = self.population.get_sample(self.class_weights)
-#         image_shape = self.population.map_shapes[subject_name]
-#         position = self.random_position_around_point(position, self.patch_size, image_shape, self.patch_size - 1)
-#         patch_indices = np.stack((position, position + self.patch_size), axis=1)
-#         return subject_name, patch_indices, class_id
-#
-#     def random_position_around_point(self, position, patch_size, image_shape, max_movement):
-#         min_pos = [max(0, position[axis] - (patch_size[axis] - max_movement[axis])) for axis in range(len(patch_size))]
-#         max_pos = [min(position[axis], image_shape[axis] - patch_size[axis]) for axis in range(len(patch_size))]
-#         pos = [random.randint(min_pos[axis], max_pos[axis]) if min_pos[axis] < max_pos[axis] else max_pos[axis] for axis in range(len(self.patch_size))]
-#         return pos
-
-
-if __name__ == '__main__':
-    # image_size = (1000, 1000, 1000)  # (2010, 450, 2010)
-    # patch_size = (100, 100, 100)
-    # patch_overlap = (100, 100, 100)
-
-    image_size = (301,)  # (2010, 450, 2010)
-    patch_size = (20,)
-    patch_overlap = (10,)
-    chunk_size = (60,)
-    grid_sampler = _ChunkGridSampler(spatial_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap,
-                                     chunk_size=chunk_size)
-
-    # image_size = (299,)  # (2010, 450, 2010)
-    # patch_size = (50,)
-    # patch_overlap = (40,)
-    # # chunk_size = (50,)
-    # grid_sampler = GridSampler(image_size=image_size, patch_size=patch_size, patch_overlap=patch_overlap)
-
-    print(len(grid_sampler))
-
-    for i, indices in enumerate(grid_sampler):
-        print("Iteration: {}, indices: {}".format(i, indices))
+            patch_result = *patch_result, chunk_id
+        return patch_result

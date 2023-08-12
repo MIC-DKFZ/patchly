@@ -171,15 +171,18 @@ class _CropGridSampler:
         self.spatial_first = spatial_first
         self.patch_size = patch_size
         self.patch_overlap = patch_overlap
-        self.indices = self.compute_indices()
+        self.indices, self.patch_sizes = self.compute_patches()
 
-    def compute_indices(self):
+    def compute_patches(self):
         n_axis = len(self.spatial_size)
         stop = [self.spatial_size[axis] - self.patch_size[axis] + 1 for axis in range(n_axis)]
         axis_indices = [np.arange(0, stop[axis], self.patch_overlap[axis]) for axis in range(n_axis)]
+        patch_sizes = [[self.patch_size[axis]] * len(axis_indices[axis]) for axis in range(n_axis)]
         axis_indices = np.meshgrid(*axis_indices, indexing='ij')
+        patch_sizes = np.meshgrid(*patch_sizes, indexing='ij')
         indices = np.column_stack([axis_indices[axis].ravel() for axis in range(n_axis)])
-        return indices
+        patch_sizes = np.column_stack([patch_sizes[axis].ravel() for axis in range(n_axis)])
+        return indices, patch_sizes
 
     def __iter__(self):
         self.index = 0
@@ -193,7 +196,7 @@ class _CropGridSampler:
         patch_indices = np.zeros(len(indices) * 2, dtype=int).reshape(-1, 2)
         for axis in range(len(indices)):
             patch_indices[axis][0] = indices[axis]
-            patch_indices[axis][1] = indices[axis] + self.patch_size[axis]
+            patch_indices[axis][1] = indices[axis] + self.patch_sizes[idx][axis]
         patch_result = self.get_patch_result(patch_indices)
         return patch_result
 
@@ -248,7 +251,7 @@ class _EdgeGridSampler(_CropGridSampler):
         """
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)
 
-    def compute_indices(self):
+    def compute_patches(self):
         n_axis = len(self.spatial_size)
         stop = [self.spatial_size[axis] - self.patch_size[axis] + 1 for axis in range(n_axis)]
         axis_indices = [np.arange(0, stop[axis], self.patch_overlap[axis]) for axis in range(n_axis)]
@@ -256,9 +259,12 @@ class _EdgeGridSampler(_CropGridSampler):
             if axis_indices[axis][-1] != self.spatial_size[axis] - self.patch_size[axis]:
                 axis_indices[axis] = np.append(axis_indices[axis], [self.spatial_size[axis] - self.patch_size[axis]],
                                                axis=0)
+        patch_sizes = [[self.patch_size[axis]] * len(axis_indices[axis]) for axis in range(n_axis)]
         axis_indices = np.meshgrid(*axis_indices, indexing='ij')
+        patch_sizes = np.meshgrid(*patch_sizes, indexing='ij')
         indices = np.column_stack([axis_indices[axis].ravel() for axis in range(n_axis)])
-        return indices
+        patch_sizes = np.column_stack([patch_sizes[axis].ravel() for axis in range(n_axis)])
+        return indices, patch_sizes
 
 
 class _AdaptiveGridSampler(_CropGridSampler):
@@ -267,22 +273,18 @@ class _AdaptiveGridSampler(_CropGridSampler):
         # TODO: Do doc
         super().__init__(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, image=image, spatial_first=spatial_first)
 
-    def compute_indices(self):
+    def compute_patches(self):
         n_axis = len(self.spatial_size)
         stop = [self.spatial_size[axis] for axis in range(n_axis)]
         axis_indices = [np.arange(0, stop[axis], self.patch_overlap[axis]) for axis in range(n_axis)]
+        patch_sizes = [[self.patch_size[axis]] * len(axis_indices[axis]) for axis in range(n_axis)]
+        for axis in range(n_axis):
+            patch_sizes[axis][-1] = self.spatial_size[axis] - axis_indices[axis][-1]
         axis_indices = np.meshgrid(*axis_indices, indexing='ij')
+        patch_sizes = np.meshgrid(*patch_sizes, indexing='ij')
         indices = np.column_stack([axis_indices[axis].ravel() for axis in range(n_axis)])
-        return indices
-
-    def __getitem__(self, idx):
-        indices = self.indices[idx]
-        patch_indices = np.zeros(len(indices) * 2, dtype=int).reshape(-1, 2)
-        for axis in range(len(indices)):
-            patch_indices[axis][0] = indices[axis]
-            patch_indices[axis][1] = min(indices[axis] + self.patch_size[axis], self.spatial_size[axis])
-        patch_result = self.get_patch_result(patch_indices)
-        return patch_result
+        patch_sizes = np.column_stack([patch_sizes[axis].ravel() for axis in range(n_axis)])
+        return indices, patch_sizes
 
 
 class _ChunkGridSampler(_CropGridSampler):
@@ -295,7 +297,7 @@ class _ChunkGridSampler(_CropGridSampler):
         self.chunk_index = 0
         self.patch_index = 0
 
-    def compute_indices(self):
+    def compute_patches(self):
         self.grid_sampler = GridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, mode=self.mode)
         self.chunk_sampler = []
         self.chunk_sampler_offset = []
@@ -306,7 +308,7 @@ class _ChunkGridSampler(_CropGridSampler):
             self.chunk_sampler.append(
                 _CropGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))
             self.chunk_sampler_offset.append(copy.copy(chunk_indices[:, 0]))
-        return None
+        return None, None
 
     def compute_length(self):
         self.cumsum_length = [0]

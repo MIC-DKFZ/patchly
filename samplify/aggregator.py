@@ -1,5 +1,5 @@
 import numpy as np
-from samplify.sampler import GridSampler, _EdgeGridSampler
+from samplify.sampler import GridSampler, _CropGridSampler
 from samplify.slicer import slicer
 from samplify import utils
 from scipy.ndimage.filters import gaussian_filter
@@ -206,7 +206,7 @@ class _ChunkAggregator(_Aggregator):
 
         for chunk_id, chunk_indices in enumerate(self.chunk_indices):
             chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
-            sampler = _EdgeGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap)
+            sampler = _CropGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap)
             sampler_offset = copy.copy(chunk_indices[:, 0])
             self.chunk_sampler.append(sampler)
             self.chunk_sampler_offset.append(sampler_offset)

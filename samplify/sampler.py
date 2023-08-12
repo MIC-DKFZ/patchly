@@ -304,7 +304,7 @@ class _ChunkGridSampler(_CropGridSampler):
             chunk_indices = chunk_indices.reshape(-1, 2)
             chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
             self.chunk_sampler.append(
-                _EdgeGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))
+                _CropGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap))
             self.chunk_sampler_offset.append(copy.copy(chunk_indices[:, 0]))
         return None
 

@@ -9,7 +9,7 @@ Samplify supports:
 - Sampling and aggregation of images
 - Any array-like images (Numpy, Tensor, Zarr, Dask, ...)
 - Memory-mapped images
-- Patch overlap
+- Patch overlap (here referred to as patch offset)
 - All numpy padding techniques
 - Images with non-spatial dimensions (color dimension, batch dimension, etc)
 - Chunk sampling to minimize memory consumption
@@ -39,7 +39,7 @@ To install Samplify, you'll first need to clone the repository to your local mac
 
 Demonstration on how to use Samplify for sliding-window patchification and subsequent aggregation:
 ```python
-sampler = GridSampler(spatial_size, patch_size, patch_overlap, image)
+sampler = GridSampler(spatial_size, patch_size, patch_offset, image)
 aggregator = Aggregator(sampler, output_size)
 
 for patch, patch_bbox in sampler:
@@ -77,7 +77,7 @@ def model(x):
     return y
 
 # Init GridSampler
-sampler = GridSampler(image=np.random.random((1000, 1000, 3)), spatial_size=(1000, 1000), patch_size=(100, 100), patch_overlap=(50, 50))
+sampler = GridSampler(image=np.random.random((1000, 1000, 3)), spatial_size=(1000, 1000), patch_size=(100, 100), patch_offset=(50, 50))
 # Init dataloader
 loader = DataLoader(ExampleDataset(sampler), batch_size=4, num_workers=0, shuffle=False)
 # Init aggregator

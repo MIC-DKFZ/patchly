@@ -25,7 +25,7 @@ class Aggregator:
         self.sampler = sampler
         self.spatial_size_s = sampler.spatial_size_s
         self.patch_size_s = sampler.patch_size_s
-        self.patch_overlap_s = sampler.patch_overlap_s
+        self.patch_offset_s = sampler.patch_offset_s
         self.chunk_size_s = chunk_size
         self.spatial_first = spatial_first
         self.mode = sampler.mode
@@ -61,8 +61,8 @@ class Aggregator:
             else:
                 weight_map_size_s = self.chunk_size_s
             if weights_s == 'avg':
-                # uint8 saves memory, but might be problematic when using a very small patch overlap
-                # Consider providing your own uint16 weight map when working with a very small patch overlap
+                # uint8 saves memory, but might be problematic when using a very small patch offset
+                # Consider providing your own uint16 weight map when working with a very small patch offset
                 weight_map_s = np.zeros(weight_map_size_s, dtype=np.uint8)
             else:
                 weight_map_s = np.zeros(weight_map_size_s, dtype=np.float32)
@@ -97,7 +97,7 @@ class Aggregator:
             aggregator = _Aggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s,
                                   output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s, weight_map_s=self.weight_map_s)
         elif self.mode.startswith('sample_') and self.chunk_size_s is not None:
-            aggregator = _ChunkAggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_overlap_s=self.patch_overlap_s, chunk_size_s=self.chunk_size_s,
+            aggregator = _ChunkAggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, chunk_size_s=self.chunk_size_s,
                                        output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s, mode=self.mode)
         elif self.mode.startswith('pad_') and self.chunk_size_s is None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
@@ -195,7 +195,7 @@ class _Aggregator:
 
 
 class _ChunkAggregator(_Aggregator):
-    def __init__(self, sampler: GridSampler, spatial_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_overlap_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
+    def __init__(self, sampler: GridSampler, spatial_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_offset_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
                  output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True,
                  softmax_dim: Optional[int] = None, weight_patch_s: npt.ArrayLike = None, mode: str = 'sample_edge'):
         """
@@ -209,7 +209,7 @@ class _ChunkAggregator(_Aggregator):
         :param low_memory_mode: Reduces memory consumption by more than 50% in comparison to the normal WeightedAggregator and Aggregator. However, the prediction quality is slightly reduced.
         """
         super().__init__(sampler=sampler, spatial_size_s=spatial_size_s, patch_size_s=patch_size_s, output_h=output_h, spatial_first=spatial_first, softmax_dim=softmax_dim, weight_patch_s=weight_patch_s, weight_map_s=None)
-        self.patch_overlap_s = patch_overlap_s
+        self.patch_offset_s = patch_offset_s
         self.chunk_size_s = chunk_size_s
         self.chunk_dtype = self.set_chunk_dtype()
         self.mode = mode
@@ -224,7 +224,7 @@ class _ChunkAggregator(_Aggregator):
 
     def compute_patches(self):
         patch_sampler = self.sampler
-        chunk_sampler = _AdaptiveGridSampler(spatial_size_s=self.spatial_size_s, patch_size_s=self.chunk_size_s, patch_overlap_s=self.chunk_size_s)
+        chunk_sampler = _AdaptiveGridSampler(spatial_size_s=self.spatial_size_s, patch_size_s=self.chunk_size_s, patch_offset_s=self.chunk_size_s)
         chunk_patch_dict = defaultdict(dict)
         patch_chunk_dict = defaultdict(dict)
         

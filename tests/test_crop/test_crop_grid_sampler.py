@@ -7,7 +7,7 @@ from samplify import utils
 
 
 class TestBasicGridSampler(unittest.TestCase):
-    def test_without_overlap_without_remainder_2d(self):
+    def test_without_offset_without_remainder_2d(self):
         patch_size = (10, 10)
         spatial_size = (100, 100)
         result_size = spatial_size
@@ -15,7 +15,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self._test_sampler(image, result_size, spatial_size, patch_size)
 
-    def test_without_overlap_with_remainder_2d(self):
+    def test_without_offset_with_remainder_2d(self):
         patch_size = (10, 10)
         spatial_size = (103, 107)
         result_size = (100, 100)
@@ -23,34 +23,34 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self._test_sampler(image, result_size, spatial_size, patch_size)
 
-    def test_with_overlap_without_remainder_2d(self):
-        patch_overlap = (5, 5)
+    def test_with_offset_without_remainder_2d(self):
+        patch_offset = (5, 5)
         patch_size = (10, 10)
         spatial_size = (100, 100)
         result_size = spatial_size
         image = np.random.random(spatial_size)
 
-        self._test_sampler(image, result_size, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_sampler(image, result_size, spatial_size, patch_size, patch_offset=patch_offset)
 
-    def test_with_overlap_with_remainder_2d(self):
-        patch_overlap = (5, 5)
+    def test_with_offset_with_remainder_2d(self):
+        patch_offset = (5, 5)
         patch_size = (10, 10)
         spatial_size = (103, 107)
         result_size = (100, 100)
         image = np.random.random(spatial_size)
 
-        self._test_sampler(image, result_size, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_sampler(image, result_size, spatial_size, patch_size, patch_offset=patch_offset)
 
-    def test_with_overlap_with_remainder_2d_v2(self):
-        patch_overlap = (3, 3)
+    def test_with_offset_with_remainder_2d_v2(self):
+        patch_offset = (3, 3)
         patch_size = (10, 10)
         spatial_size = (103, 107)
         result_size = (100, 100)
         image = np.random.random(spatial_size)
 
-        self._test_sampler(image, result_size, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_sampler(image, result_size, spatial_size, patch_size, patch_offset=patch_offset)
 
-    def test_without_overlap_without_remainder_3d(self):
+    def test_without_offset_without_remainder_3d(self):
         patch_size = (10, 10, 5)
         spatial_size = (100, 100, 50)
         result_size = spatial_size
@@ -58,7 +58,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self._test_sampler(image, result_size, spatial_size, patch_size)
 
-    def test_without_overlap_with_remainder_3d(self):
+    def test_without_offset_with_remainder_3d(self):
         patch_size = (10, 10, 5)
         spatial_size = (103, 107, 51)
         result_size = (100, 100, 50)
@@ -66,25 +66,25 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self._test_sampler(image, result_size, spatial_size, patch_size)
 
-    def test_with_overlap_without_remainder_3d(self):
-        patch_overlap = (5, 5, 5)
+    def test_with_offset_without_remainder_3d(self):
+        patch_offset = (5, 5, 5)
         patch_size = (10, 10, 5)
         spatial_size = (100, 100, 50)
         result_size = spatial_size
         image = np.random.random(spatial_size)
 
-        self._test_sampler(image, result_size, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_sampler(image, result_size, spatial_size, patch_size, patch_offset=patch_offset)
 
-    def test_with_overlap_with_remainder_3d(self):
-        patch_overlap = (5, 5, 5)
+    def test_with_offset_with_remainder_3d(self):
+        patch_offset = (5, 5, 5)
         patch_size = (10, 10, 5)
         spatial_size = (103, 107, 51)
         result_size = (100, 100, 50)
         image = np.random.random(spatial_size)
 
-        self._test_sampler(image, result_size, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_sampler(image, result_size, spatial_size, patch_size, patch_offset=patch_offset)
 
-    def test_without_overlap_without_remainder_Nd(self):
+    def test_without_offset_without_remainder_Nd(self):
         patch_size = (2, 8, 4, 4, 4)
         spatial_size = (4, 16, 8, 8, 4)
         result_size = spatial_size
@@ -92,7 +92,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self._test_sampler(image, result_size, spatial_size, patch_size)
 
-    def test_without_overlap_with_remainder_Nd(self):
+    def test_without_offset_with_remainder_Nd(self):
         patch_size = (2, 8, 4, 4, 4)
         spatial_size = (5, 18, 9, 10, 6)
         result_size = (4, 16, 8, 8, 4)
@@ -100,23 +100,23 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self._test_sampler(image, result_size, spatial_size, patch_size)
 
-    def test_with_overlap_without_remainder_Nd(self):
-        patch_overlap = (1, 8, 2, 2, 2)
+    def test_with_offset_without_remainder_Nd(self):
+        patch_offset = (1, 8, 2, 2, 2)
         patch_size = (2, 8, 4, 4, 4)
         spatial_size = (4, 16, 8, 8, 4)
         result_size = spatial_size
         image = np.random.random(spatial_size)
 
-        self._test_sampler(image, result_size, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_sampler(image, result_size, spatial_size, patch_size, patch_offset=patch_offset)
 
-    def test_with_overlap_with_remainder_Nd(self):
-        patch_overlap = (1, 8, 2, 2, 2)
+    def test_with_offset_with_remainder_Nd(self):
+        patch_offset = (1, 8, 2, 2, 2)
         patch_size = (2, 8, 4, 4, 4)
         spatial_size = (5, 18, 9, 10, 6)
         result_size = (4, 16, 8, 8, 4)
         image = np.random.random(spatial_size)
 
-        self._test_sampler(image, result_size, spatial_size, patch_size, patch_overlap=patch_overlap)
+        self._test_sampler(image, result_size, spatial_size, patch_size, patch_offset=patch_offset)
 
     def test_channel_first(self):
         patch_size = (10, 10)
@@ -170,13 +170,13 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode="sample_crop")
 
-    def test_overlap_size_larger_than_patch_size(self):
-        patch_overlap = (11, 10)
+    def test_offset_size_larger_than_patch_size(self):
+        patch_offset = (11, 10)
         patch_size = (10, 10)
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
 
-        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, mode="sample_crop")
+        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, mode="sample_crop")
 
     def test_spatial_size_unequal_to_spatial_image_size(self):
         patch_size = (10, 10)
@@ -185,10 +185,10 @@ class TestBasicGridSampler(unittest.TestCase):
 
         self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode="sample_crop")
 
-    def _test_sampler(self, image, result_size, spatial_size, patch_size, patch_overlap=None, spatial_first=True):
+    def _test_sampler(self, image, result_size, spatial_size, patch_size, patch_offset=None, spatial_first=True):
         # Test with image
         result = np.zeros(result_size)
-        sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_crop")
+        sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first, mode="sample_crop")
 
         for patch, patch_bbox in sampler:
             if not spatial_first:
@@ -200,18 +200,18 @@ class TestBasicGridSampler(unittest.TestCase):
             patch_bbox = utils.bbox_s_to_bbox_h(patch_bbox, image, spatial_first)
             np.testing.assert_array_equal(patch, image[slicer(image, patch_bbox)], err_msg="image shape: {}, patch shape: {}, patch bbox: {}".format(image.shape, patch.shape, patch_bbox))
 
-        self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
+        self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_offset: {}".format(
             np.sum(result), result.size, result.shape, image.shape, patch_size, patch_size
         ))
 
         # Test without image
         result = np.zeros(result_size)
-        sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_crop")
+        sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first, mode="sample_crop")
 
         for patch_bbox in sampler:
             result[slicer(result, patch_bbox)] = 1
 
-        self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
+        self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_offset: {}".format(
             np.sum(result), result.size, result.shape, image.shape, patch_size, patch_size
         ))
 

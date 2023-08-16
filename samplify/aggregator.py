@@ -162,8 +162,8 @@ class _Aggregator:
         if self.computed_inplace:
             raise RuntimeError("get_output() has already been called with inplace=True. Therefore, no further patches can be appended.")
         if self.weight_patch_h is None:
-            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.add_non_spatial_dims(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
-        patch_bbox_h = utils.add_non_spatial_bbox_dims(patch_bbox_s, self.output_h, self.spatial_first)
+            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.data_s_to_data_h(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
+        patch_bbox_h = utils.bbox_s_to_bbox_h(patch_bbox_s, self.output_h, self.spatial_first)
         self.output_h[slicer(self.output_h, patch_bbox_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
         if self.weight_map_s is not None:
             self.weight_map_s[slicer(self.weight_map_s, patch_bbox_s)][...] += self.weight_patch_s
@@ -181,7 +181,7 @@ class _Aggregator:
 
         if not inplace or (inplace and not self.computed_inplace):
             if self.weight_map_s is not None:
-                weight_map_h = utils.broadcast_to(self.weight_map_s, utils.add_non_spatial_dims(self.weight_map_s.shape, output_h.shape, self.spatial_first), self.spatial_first)
+                weight_map_h = utils.broadcast_to(self.weight_map_s, utils.data_s_to_data_h(self.weight_map_s.shape, output_h.shape, self.spatial_first), self.spatial_first)
                 output_h[...] = output_h / weight_map_h.astype(output_h.dtype)
                 output_h[...] = np.nan_to_num(output_h)
             if self.softmax_dim is not None:
@@ -253,7 +253,7 @@ class _ChunkAggregator(_Aggregator):
         patch_bbox_s = patch_bbox
 
         if self.weight_patch_h is None:
-            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.add_non_spatial_dims(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
+            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.data_s_to_data_h(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
 
         self.patch_chunk_dict[str(patch_bbox_s)]["patch"].create(patch_h)
 
@@ -275,7 +275,7 @@ class _ChunkAggregator(_Aggregator):
     def process_chunk(self, chunk_id):
         patch_size_h = list(self.chunk_patch_dict[chunk_id].values())[0]["patch"].shape
         chunk_size_s = self.chunk_sampler.patch_sizes_s[chunk_id]
-        chunk_size_h = utils.add_non_spatial_dims(chunk_size_s, patch_size_h, self.spatial_first)
+        chunk_size_h = utils.data_s_to_data_h(chunk_size_s, patch_size_h, self.spatial_first)
         chunk_h = np.zeros(chunk_size_h, dtype=self.chunk_dtype)
         if self.softmax_dim is None:
             weight_map_h = np.zeros(chunk_size_h)
@@ -285,8 +285,8 @@ class _ChunkAggregator(_Aggregator):
             patch_h = patch_data["patch"].data
             patch_data["patch"] = None
             patch_data["status"] = PatchStatus.COMPLETED
-            crop_patch_bbox_h = utils.add_non_spatial_bbox_dims(crop_patch_bbox_s, chunk_h, self.spatial_first)
-            valid_patch_bbox_h = utils.add_non_spatial_bbox_dims(valid_patch_bbox_s, chunk_h, self.spatial_first)
+            crop_patch_bbox_h = utils.bbox_s_to_bbox_h(crop_patch_bbox_s, chunk_h, self.spatial_first)
+            valid_patch_bbox_h = utils.bbox_s_to_bbox_h(valid_patch_bbox_s, chunk_h, self.spatial_first)
             valid_patch_h = patch_h[slicer(patch_h, crop_patch_bbox_h)]
             valid_weight_patch_h = self.weight_patch_h[slicer(self.weight_patch_h, crop_patch_bbox_h)]
             chunk_h[slicer(chunk_h, valid_patch_bbox_h)] += valid_patch_h.astype(chunk_h.dtype) * valid_weight_patch_h.astype(chunk_h.dtype)
@@ -299,7 +299,7 @@ class _ChunkAggregator(_Aggregator):
             # Argmax the softmax chunk
             chunk_h = chunk_h.argmax(axis=self.softmax_dim).astype(np.uint16)
         chunk_bbox_h = self.chunk_sampler.__getitem__(chunk_id)
-        chunk_bbox_h = utils.add_non_spatial_bbox_dims(chunk_bbox_h, self.output_h, self.spatial_first)
+        chunk_bbox_h = utils.bbox_s_to_bbox_h(chunk_bbox_h, self.output_h, self.spatial_first)
         self.output_h[slicer(self.output_h, chunk_bbox_h)] = chunk_h.astype(self.output_h.dtype)
 
     def get_output(self, inplace: bool = False):

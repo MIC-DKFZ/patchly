@@ -185,7 +185,7 @@ class _CropGridSampler:
 
     def get_patch_result(self, patch_bbox_s):
         if self.image_h is not None and not isinstance(self.image_h, dict):
-            patch_bbox_h = utils.add_non_spatial_bbox_dims(patch_bbox_s, self.image_h, self.spatial_first)
+            patch_bbox_h = utils.bbox_s_to_bbox_h(patch_bbox_s, self.image_h, self.spatial_first)
             patch_h = self.image_h[slicer(self.image_h, patch_bbox_h)]
             return patch_h, patch_bbox_s
         else:

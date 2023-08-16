@@ -27,7 +27,7 @@ class LazyArray:
         self.data[key] = value
 
 
-def add_non_spatial_bbox_dims(bbox_s, image_h, spatial_first):
+def bbox_s_to_bbox_h(bbox_s, image_h, spatial_first):
     dims_n = len(image_h.shape) - len(bbox_s[:, 0])
     if spatial_first:
         bbox_h = [index_pair.tolist() for index_pair in bbox_s]
@@ -38,7 +38,7 @@ def add_non_spatial_bbox_dims(bbox_s, image_h, spatial_first):
     return bbox_h
 
 
-def add_non_spatial_dims(data_size1_s, data_size2_h, spatial_first):
+def data_s_to_data_h(data_size1_s, data_size2_h, spatial_first):
     dims_n = len(data_size2_h) - len(data_size1_s)
     if dims_n > 0 and spatial_first:
         dims_n = data_size2_h[len(data_size1_s):]

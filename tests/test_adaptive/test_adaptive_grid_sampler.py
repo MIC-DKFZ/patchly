@@ -175,7 +175,7 @@ class TestAdaptiveGridSampler(unittest.TestCase):
 
         for patch, patch_bbox in sampler:
             result[slicer(result, patch_bbox)] = 1
-            patch_bbox = utils.add_non_spatial_bbox_dims(patch_bbox, image, spatial_first)
+            patch_bbox = utils.bbox_s_to_bbox_h(patch_bbox, image, spatial_first)
             np.testing.assert_array_equal(patch, image[slicer(image, patch_bbox)], err_msg="image shape: {}, patch shape: {}, patch bbox: {}".format(image.shape, patch.shape, patch_bbox))
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(

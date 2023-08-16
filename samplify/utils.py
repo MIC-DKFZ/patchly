@@ -1,29 +1,55 @@
 import numpy as np
 
 
-def add_non_spatial_indices(image, patch_indices, spatial_size, spatial_first):
-    non_spatial_dims = len(image.shape) - len(spatial_size)
+class LazyArray:
+    def __init__(self):
+        self._data = None
+
+    def create(self, data):
+        self._data = data
+
+    @property
+    def data(self):
+        if self._data is None:
+            raise ValueError("LazyArray has not been initialized.")
+        return self._data
+    
+    @property
+    def shape(self):
+        if self._data is None:
+            raise ValueError("LazyArray has not been initialized.")
+        return self._data.shape
+
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def __setitem__(self, key, value):
+        self.data[key] = value
+
+
+def add_non_spatial_indices(patch_indices_s, image_h, spatial_first):
+    dims_n = len(image_h.shape) - len(patch_indices_s[:, 0])
     if spatial_first:
-        slices = [index_pair.tolist() for index_pair in patch_indices]
-        slices.extend([[None]] * non_spatial_dims)
+        slices_h = [index_pair.tolist() for index_pair in patch_indices_s]
+        slices_h.extend([[None]] * dims_n)
     else:
-        slices = [[None]] * non_spatial_dims
-        slices.extend([index_pair.tolist() for index_pair in patch_indices])
-    return slices
+        slices_h = [[None]] * dims_n
+        slices_h.extend([index_pair.tolist() for index_pair in patch_indices_s])
+    return slices_h
 
 
-def add_non_spatial_dims(spatial_data_size_a, data_size_b, spatial_size, spatial_first):
-    non_spatial_dims = len(data_size_b) - len(spatial_size)
-    if non_spatial_dims > 0 and spatial_first:
-        non_spatial_dims = data_size_b[len(spatial_size):]
-        data_size_a = (*spatial_data_size_a, *non_spatial_dims)
-        return data_size_a
-    elif non_spatial_dims > 0:
-        non_spatial_dims = data_size_b[:-len(spatial_size)]
-        data_size_a = (*non_spatial_dims, *spatial_data_size_a)
-        return data_size_a
+def add_non_spatial_dims(data_size1_s, data_size2_h, spatial_first):
+    dims_n = len(data_size2_h) - len(data_size1_s)
+    if dims_n > 0 and spatial_first:
+        dims_n = data_size2_h[len(data_size1_s):]
+        data_size1_h = (*data_size1_s, *dims_n)
+        return data_size1_h
+    elif dims_n > 0:
+        dims_n = data_size2_h[:-len(data_size1_s)]
+        data_size1_h = (*dims_n, *data_size1_s)
+        return data_size1_h
     else:
-        return spatial_data_size_a
+        return data_size1_s
     
 
 def broadcast_to(data, target_shape, spatial_first):
@@ -37,3 +63,22 @@ def broadcast_to(data, target_shape, spatial_first):
         data_reshaped = np.broadcast_to(data, target_shape)
     data_reshaped = np.copy(data_reshaped)
     return data_reshaped
+
+
+def is_overlapping(bbox1, bbox2):
+    """
+    Check if two N-D bounding boxes overlap.
+    
+    Bounding boxes are defined as [[x_start, x_end], [y_start, y_end], ...].
+    
+    Args:
+    - box1, box2: The bounding boxes to check.
+
+    Returns:
+    - True if the boxes overlap, False otherwise.
+    """
+
+    for (start1, end1), (start2, end2) in zip(bbox1, bbox2):
+        if start1 >= end2 or start2 >= end1:
+            return False
+    return True

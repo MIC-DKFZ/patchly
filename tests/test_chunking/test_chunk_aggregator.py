@@ -8,7 +8,7 @@ from scipy.ndimage.filters import gaussian_filter
 import copy
 
 
-class TestChunkEdgeAggregator(unittest.TestCase):
+class TestChunkAggregator(unittest.TestCase):
     def test_without_overlap_without_remainder_2d(self):
         patch_size = (10, 10)
         spatial_size = (100, 100)
@@ -42,15 +42,6 @@ class TestChunkEdgeAggregator(unittest.TestCase):
         image = np.random.random(spatial_size)
 
         self._test_aggregator(image, spatial_size, patch_size, chunk_size, patch_overlap=patch_overlap)
-
-    def test_with_overlap_with_remainder_2d_v2(self):
-        patch_overlap = (3, 3)
-        patch_size = (10, 10)
-        chunk_size = (50, 50)
-        spatial_size = (103, 107)
-        image = np.random.random(spatial_size)
-
-        self.assertRaises(RuntimeError, self._test_aggregator, image=image, spatial_size=spatial_size, patch_size=patch_size, chunk_size=chunk_size, patch_overlap=patch_overlap)
 
     def test_without_overlap_without_remainder_3d(self):
         patch_size = (10, 10, 5)
@@ -201,8 +192,9 @@ class TestChunkEdgeAggregator(unittest.TestCase):
         output = np.zeros(spatial_size, dtype=np.uint16)
         spatial_first_sampler = False
         spatial_first_aggregator = False
+        softmax_dim = 0
 
-        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first_sampler=spatial_first_sampler, spatial_first_aggregator=spatial_first_aggregator, output=output, softmax_dim=0)
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, spatial_first_sampler=spatial_first_sampler, spatial_first_aggregator=spatial_first_aggregator, output=output, softmax_dim=softmax_dim)
 
     def _test_aggregator(self, image, spatial_size, patch_size, chunk_size, patch_overlap=None, spatial_first_sampler=True, spatial_first_aggregator=True, output=None, weights='avg', multiply_elements_by_two=False, softmax_dim=None):
         if softmax_dim is None:
@@ -211,15 +203,15 @@ class TestChunkEdgeAggregator(unittest.TestCase):
             output_size = np.moveaxis(image.shape, softmax_dim, 0)[1:]
         
         # Test with output size
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first_sampler, mode="sample_edge")
-        aggregator = Aggregator(sampler=sampler, output_size=output_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first_sampler, mode="sample_edge")
+        aggregator = Aggregator(sampler=sampler, output_size=output_size, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
-        for i, (patch, patch_indices, chunk_id) in enumerate(sampler):
+        for i, (patch, patch_indices) in enumerate(sampler):
             if multiply_elements_by_two:
                 _patch = patch * 2
             else:
                 _patch = patch
-            aggregator.append(_patch, patch_indices, chunk_id)
+            aggregator.append(_patch, patch_indices)
 
         output1 = aggregator.get_output()
 
@@ -232,15 +224,15 @@ class TestChunkEdgeAggregator(unittest.TestCase):
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=spatial_first_sampler, mode="sample_edge")
-        aggregator = Aggregator(sampler=sampler, output=output, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first_sampler, mode="sample_edge")
+        aggregator = Aggregator(sampler=sampler, output=output, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
-        for i, (patch, patch_indices, chunk_id) in enumerate(sampler):
+        for i, (patch, patch_indices) in enumerate(sampler):
             if multiply_elements_by_two:
                 _patch = patch * 2
             else:
                 _patch = patch
-            aggregator.append(_patch, patch_indices, chunk_id)
+            aggregator.append(_patch, patch_indices)
 
         output2 = aggregator.get_output()
 

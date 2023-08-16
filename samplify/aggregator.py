@@ -1,5 +1,5 @@
 import numpy as np
-from samplify.sampler import GridSampler, _CropGridSampler
+from samplify.sampler import GridSampler, _AdaptiveGridSampler
 from samplify.slicer import slicer
 from samplify import utils
 from scipy.ndimage.filters import gaussian_filter
@@ -8,112 +8,128 @@ import copy
 import concurrent.futures
 from typing import Union, Optional, Tuple, Callable
 import numpy.typing as npt
+from enum import Enum
+import zarr
+import warnings
+
+
+class PatchStatus(Enum):
+    EMPTY = 1
+    FILLED = 2
+    COMPLETED = 3
 
 
 class Aggregator:
-    def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, 
+    def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
                  weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None, spatial_first: bool = True):
         self.sampler = sampler
-        self.spatial_size = sampler.spatial_size
-        self.patch_size = sampler.patch_size
-        self.patch_overlap = sampler.patch_overlap
-        self.chunk_size = sampler.chunk_size
+        self.spatial_size_s = sampler.spatial_size_s
+        self.patch_size_s = sampler.patch_size_s
+        self.patch_overlap_s = sampler.patch_overlap_s
+        self.chunk_size_s = chunk_size
         self.spatial_first = spatial_first
         self.mode = sampler.mode
         self.softmax_dim = softmax_dim
-        self.output = self.set_output(output, output_size)
-        self.weight_patch, self.weight_map = self.set_weights(weights)
+        self.output_h = self.set_output(output, output_size)
+        self.weight_patch_s, self.weight_map_s = self.set_weights(weights)
         self.check_sanity()
-        self.aggregator = self.set_aggregator(self.output, self.softmax_dim)
+        self.aggregator = self.set_aggregator(self.sampler, self.output_h, self.softmax_dim)
 
-    def set_output(self, output, output_size):
-        if output is None and output_size is not None:
-            output = np.zeros(output_size, dtype=np.float32)
-            return output
-        elif output is None and output_size is None:
+    def set_output(self, output_h, output_size_h):
+        if output_h is None and output_size_h is not None:
+            output_h = np.zeros(output_size_h, dtype=np.float32)
+            return output_h
+        elif output_h is None and output_size_h is None:
             raise RuntimeError("Either the output array-like data or the output size must be given.")
-        elif output is not None and output_size is not None and output.shape != output_size:
+        elif output_h is not None and output_size_h is not None and output_h.shape != output_size_h:
             raise RuntimeError("The variable output_size must be equal to the output shape if both are given. Only one of the two must be given.")
-        return output
+        return output_h
 
-    def set_weights(self, weights):
-        if weights == 'avg':
-            weight_patch = np.ones(self.patch_size, dtype=np.uint8)
-        elif weights == 'gaussian':
-            weight_patch = self.create_gaussian_weights(self.patch_size)
-        elif callable(weights):
-            weight_patch = weights
+    def set_weights(self, weights_s):
+        if weights_s == 'avg':
+            weight_patch_s = np.ones(self.patch_size_s, dtype=np.uint8)
+        elif weights_s == 'gaussian':
+            weight_patch_s = self.create_gaussian_weights(self.patch_size_s)
+        elif callable(weights_s):
+            weight_patch_s = weights_s
         else:
             raise RuntimeError("The given type of weights is not supported.")
-        weight_patch = utils.broadcast_to(weight_patch, utils.add_non_spatial_dims(weight_patch.shape, self.output.shape, self.spatial_size, self.spatial_first), self.spatial_first)
 
         if self.softmax_dim is None:
-            if self.chunk_size is None:
-                weight_map_size = self.spatial_size
+            if self.chunk_size_s is None:
+                weight_map_size_s = self.spatial_size_s
             else:
-                weight_map_size = self.chunk_size
-            if weights == 'avg':
-                weight_map = np.zeros(weight_map_size, dtype=np.uint16)
+                weight_map_size_s = self.chunk_size_s
+            if weights_s == 'avg':
+                weight_map_s = np.zeros(weight_map_size_s, dtype=np.uint16)
             else:
-                weight_map = np.zeros(weight_map_size, dtype=np.float32)
-            weight_map = utils.broadcast_to(weight_map, utils.add_non_spatial_dims(weight_map.shape, self.output.shape, self.spatial_size, self.spatial_first), self.spatial_first)
+                weight_map_s = np.zeros(weight_map_size_s, dtype=np.float32)
         else:
-            weight_map = None
-        return weight_patch, weight_map
+            weight_map_s = None
+        return weight_patch_s, weight_map_s
     
-    def create_gaussian_weights(self, size):
+    def create_gaussian_weights(self, size_s):
         sigma_scale = 1. / 8
-        sigmas = size * sigma_scale
-        center_coords = size // 2
-        tmp = np.zeros(size)
+        sigmas = size_s * sigma_scale
+        center_coords = size_s // 2
+        tmp = np.zeros(size_s)
         tmp[tuple(center_coords)] = 1
-        gaussian_weights = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
-        gaussian_weights[gaussian_weights == 0] = np.min(gaussian_weights[gaussian_weights != 0])
-        return gaussian_weights
+        gaussian_weights_s = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
+        gaussian_weights_s[gaussian_weights_s == 0] = np.min(gaussian_weights_s[gaussian_weights_s != 0])
+        return gaussian_weights_s
 
     def check_sanity(self):
-        if not hasattr(self.output, '__getitem__'):
+        if not hasattr(self.output_h, '__getitem__'):
             raise RuntimeError("The given output is not ArrayLike.")
-        if self.spatial_first and (self.output.shape[:len(self.spatial_size)] != tuple(self.spatial_size)):
-            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output.shape[:len(self.spatial_size)], self.spatial_size))
-        if (not self.spatial_first) and (self.output.shape[-len(self.spatial_size):] != tuple(self.spatial_size)):
-            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output.shape[-len(self.spatial_size):], self.spatial_size))
+        if self.spatial_first and (self.output_h.shape[:len(self.spatial_size_s)] != tuple(self.spatial_size_s)):
+            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[:len(self.spatial_size_s)], self.spatial_size_s))
+        if (not self.spatial_first) and (self.output_h.shape[-len(self.spatial_size_s):] != tuple(self.spatial_size_s)):
+            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[-len(self.spatial_size_s):], self.spatial_size_s))
+        if self.chunk_size_s is not None and np.any(self.chunk_size_s > self.spatial_size_s):
+            raise RuntimeError("The chunk size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.chunk_size_s, self.spatial_size_s))
+        if self.chunk_size_s is not None and np.any(self.patch_size_s >= self.chunk_size_s):
+            raise RuntimeError("The patch size ({}) cannot be greater or equal to the chunk size ({}) in one or more dimensions.".format(self.patch_size_s, self.chunk_size_s))
 
-    def set_aggregator(self, output, softmax_dim):
-        if self.mode.startswith('sample_') and self.chunk_size is None:
-            aggregator = _Aggregator(spatial_size=self.spatial_size, patch_size=self.patch_size,
-                                  output=output, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch=self.weight_patch, weight_map=self.weight_map)
-        elif self.mode.startswith('sample_') and self.chunk_size is not None:
-            aggregator = _ChunkAggregator(spatial_size=self.spatial_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap, chunk_size=self.chunk_size,
-                                       output=output, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch=self.weight_patch, weight_map=self.weight_map)
-        elif self.mode.startswith('pad_') and self.chunk_size is None:
+    def set_aggregator(self, sampler, output_h, softmax_dim):
+        if self.mode.startswith('sample_') and self.chunk_size_s is None:
+            aggregator = _Aggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s,
+                                  output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s, weight_map_s=self.weight_map_s)
+        elif self.mode.startswith('sample_') and self.chunk_size_s is not None:
+            aggregator = _ChunkAggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_overlap_s=self.patch_overlap_s, chunk_size_s=self.chunk_size_s,
+                                       output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s, mode=self.mode)
+        elif self.mode.startswith('pad_') and self.chunk_size_s is None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        elif self.mode.startswith('pad_') and self.chunk_size is not None:
+        elif self.mode.startswith('pad_') and self.chunk_size_s is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         else:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
+        if self.chunk_size_s is not None and len(self.spatial_size_s) != len(self.chunk_size_s):
+            raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({})."
+                               .format(self.chunk_size_s, self.spatial_size_s))
+        if self.mode.startswith('pad_') and self.chunk_size_s is not None:
+            raise RuntimeError("The given sampling mode ({}) is not compatible with chunk sampling.".format(self.mode))
         return aggregator
 
-    def append(self, patch, patch_indices, chunk_id=None):
-        self.aggregator.append(patch, patch_indices, chunk_id)
+    def append(self, patch, patch_indices):
+        self.aggregator.append(patch, patch_indices)
 
     def get_output(self, inplace: bool = False):
-        output = self.aggregator.get_output(inplace)
+        output_h = self.aggregator.get_output(inplace)
         if self.sampler.pad_width is not None:
-            output = self.unpad_output(output, self.sampler.pad_width)
-        return output
+            output_h = self.unpad_output(output_h, self.sampler.pad_width)
+        return output_h
 
-    def unpad_output(self, output, pad_width):
-        pad_width[:, 1] *= -1
-        crop_slices = slicer(output, pad_width)
-        output = output[crop_slices]
-        return output
+    def unpad_output(self, output_h, pad_width_h):
+        pad_width_h[:, 1] *= -1
+        crop_slices_h = slicer(output_h, pad_width_h)
+        output_h = output_h[crop_slices_h]
+        return output_h
 
 
 class _Aggregator:
-    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike],
-                 output: Optional[npt.ArrayLike] = None, spatial_first: bool = True, softmax_dim: Optional[int] = None,
-                 weight_patch: npt.ArrayLike = None, weight_map: npt.ArrayLike = None):
+    def __init__(self, sampler: GridSampler, spatial_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike],
+                 output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, softmax_dim: Optional[int] = None,
+                 weight_patch_s: npt.ArrayLike = None, weight_map_s: npt.ArrayLike = None):
         """
         Aggregator to assemble an image with continuous content from patches. The content of overlapping patches is averaged.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
@@ -123,28 +139,34 @@ class _Aggregator:
         :param spatial_size: The image size that was used for patchification without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         """
-        self.spatial_size = np.asarray(spatial_size)
-        self.patch_size = np.asarray(patch_size)
-        self.output = output
+        self.sampler = sampler
+        self.spatial_size_s = np.asarray(spatial_size_s)
+        self.patch_size_s = np.asarray(patch_size_s)
+        self.output_h = output_h
         self.spatial_first = spatial_first
         self.softmax_dim = softmax_dim
-        self.weight_patch = weight_patch
-        self.weight_map = weight_map
+        self.weight_patch_s = weight_patch_s
+        self.weight_patch_h = None
+        self.weight_map_s = weight_map_s
         self.computed_inplace = False
 
-    def append(self, patch, patch_indices, chunk_id):
+    def append(self, patch, patch_indices):
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
         :param patch_indices: The patch indices in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
         """
+        patch_h = patch
+        patch_indices_s = patch_indices
+
         if self.computed_inplace:
             raise RuntimeError("get_output() has already been called with inplace=True. Therefore, no further patches can be appended.")
-        slices = utils.add_non_spatial_indices(self.output, patch_indices, self.spatial_size, self.spatial_first)
-        self.output[slicer(self.output, slices)] += patch.astype(self.output.dtype) * self.weight_patch.astype(self.output.dtype)
-        if self.weight_map is not None:
-            weight_map_patch = self.weight_map[slicer(self.weight_map, slices)]  # weight_map_patch is only a reference to a patch in self.weight_map
-            weight_map_patch[...] += self.weight_patch  # Adds patch to the map. [...] enables the use of memory-mapped array-like data
+        if self.weight_patch_h is None:
+            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.add_non_spatial_dims(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
+        patch_indices_h = utils.add_non_spatial_indices(patch_indices_s, self.output_h, self.spatial_first)
+        self.output_h[slicer(self.output_h, patch_indices_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
+        if self.weight_map_s is not None:
+            self.weight_map_s[slicer(self.weight_map_s, patch_indices_s)][...] += self.weight_patch_s
 
     def get_output(self, inplace: bool = False):
         """
@@ -153,26 +175,27 @@ class _Aggregator:
         :return: The final aggregated output.
         """
         if not inplace:
-            output = np.copy(self.output)
+            output_h = np.copy(self.output_h)
         else:
-            output = self.output
+            output_h = self.output_h
 
         if not inplace or (inplace and not self.computed_inplace):
-            if self.weight_map is not None:
-                output[...] = output / self.weight_map.astype(output.dtype)
-                output[...] = np.nan_to_num(output)
+            if self.weight_map_s is not None:
+                weight_map_h = utils.broadcast_to(self.weight_map_s, utils.add_non_spatial_dims(self.weight_map_s.shape, output_h.shape, self.spatial_first), self.spatial_first)
+                output_h[...] = output_h / weight_map_h.astype(output_h.dtype)
+                output_h[...] = np.nan_to_num(output_h)
             if self.softmax_dim is not None:
                 # Cannot be done inplace -> No [...]
-                output = output.argmax(axis=self.softmax_dim)
+                output_h = output_h.argmax(axis=self.softmax_dim)
             if inplace:
                 self.computed_inplace = True
-        return output
+        return output_h
 
 
 class _ChunkAggregator(_Aggregator):
-    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_overlap: Union[Tuple, npt.ArrayLike], chunk_size: Union[Tuple, npt.ArrayLike],
-                 output: Optional[npt.ArrayLike] = None, spatial_first: bool = True,
-                 softmax_dim: Optional[int] = None, weight_patch: npt.ArrayLike = None, weight_map: npt.ArrayLike = None, mode: str = 'sample_edge'):
+    def __init__(self, sampler: GridSampler, spatial_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_overlap_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
+                 output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True,
+                 softmax_dim: Optional[int] = None, weight_patch_s: npt.ArrayLike = None, mode: str = 'sample_edge'):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
@@ -183,104 +206,102 @@ class _ChunkAggregator(_Aggregator):
         :param weights: A weight map of size patch_size that should be used for weighting the importance of each value in a patch. Default is a gaussian weight map.
         :param low_memory_mode: Reduces memory consumption by more than 50% in comparison to the normal WeightedAggregator and Aggregator. However, the prediction quality is slightly reduced.
         """
-        super().__init__(spatial_size=spatial_size, patch_size=patch_size, output=output, spatial_first=spatial_first, softmax_dim=softmax_dim, weight_patch=weight_patch, weight_map=weight_map)
-        self.patch_overlap = patch_overlap
-        self.chunk_size = chunk_size
+        super().__init__(sampler=sampler, spatial_size_s=spatial_size_s, patch_size_s=patch_size_s, output_h=output_h, spatial_first=spatial_first, softmax_dim=softmax_dim, weight_patch_s=weight_patch_s, weight_map_s=None)
+        self.patch_overlap_s = patch_overlap_s
+        self.chunk_size_s = chunk_size_s
         self.chunk_dtype = self.set_chunk_dtype()
         self.mode = mode
-        self.compute_indices()
+        self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict = self.compute_indices()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def set_chunk_dtype(self):
         if self.softmax_dim is None:
-            return self.output.dtype
+            return self.output_h.dtype
         else:
             return np.float32
 
     def compute_indices(self):
-        self.grid_sampler = GridSampler(spatial_size=self.spatial_size, patch_size=self.chunk_size, patch_overlap=self.chunk_size - self.patch_size, mode=self.mode)
-        self.chunk_sampler = []
-        self.chunk_sampler_offset = []
-        self.chunk_indices = list(self.grid_sampler)
-        self.chunk_patches_dicts = defaultdict(dict)
+        patch_sampler = self.sampler
+        chunk_sampler = _AdaptiveGridSampler(spatial_size_s=self.spatial_size_s, patch_size_s=self.chunk_size_s, patch_overlap_s=self.chunk_size_s)
+        chunk_patch_dict = defaultdict(dict)
+        patch_chunk_dict = defaultdict(dict)
+        
+        for idx in range(len(patch_sampler)):
+            patch_indices_s = patch_sampler._get_indices(idx)
+            patch_h = utils.LazyArray()
+            patch_chunk_dict[str(patch_indices_s)]["patch"] = patch_h
+            patch_chunk_dict[str(patch_indices_s)]["chunks"] = []
+            for chunk_id, chunk_indices_s in enumerate(chunk_sampler):
+                if utils.is_overlapping(chunk_indices_s, patch_indices_s):
+                    # Shift to chunk coordinate system
+                    valid_patch_indices_s = patch_indices_s - np.array([chunk_indices_s[:, 0], chunk_indices_s[:, 0]]).T
+                    # Crop patch indices to chunk bounds
+                    valid_patch_indices_s = np.array([[max(valid_patch_indices_s[i][0], 0), min(valid_patch_indices_s[i][1], chunk_indices_s[i][1] - chunk_indices_s[i][0])] for i in range(len(chunk_indices_s))])
+                    crop_patch_indices_s = valid_patch_indices_s + np.array([chunk_indices_s[:, 0], chunk_indices_s[:, 0]]).T - np.array([patch_indices_s[:, 0], patch_indices_s[:, 0]]).T
+                    chunk_patch_dict[chunk_id][str(patch_indices_s)] = {"valid_patch_indices": valid_patch_indices_s, "crop_patch_indices": crop_patch_indices_s, "patch": patch_h, "status": PatchStatus.EMPTY}
+                    patch_chunk_dict[str(patch_indices_s)]["chunks"].append(chunk_id)
 
-        for chunk_id, chunk_indices in enumerate(self.chunk_indices):
-            chunk_size = copy.copy(chunk_indices[:, 1] - chunk_indices[:, 0])
-            sampler = _CropGridSampler(spatial_size=chunk_size, patch_size=self.patch_size, patch_overlap=self.patch_overlap)
-            sampler_offset = copy.copy(chunk_indices[:, 0])
-            self.chunk_sampler.append(sampler)
-            self.chunk_sampler_offset.append(sampler_offset)
+        return chunk_sampler, chunk_patch_dict, patch_chunk_dict
 
-            # The edges of non-border chunks need to be cropped as they have no overlap patch within the chunk
-            for axis in range(len(self.spatial_size)):
-                if 0 < chunk_indices[axis][0]:
-                    chunk_indices[axis][0] += int(self.patch_size[axis] // 2)
-                if chunk_indices[axis][1] < self.spatial_size[axis]:
-                    chunk_indices[axis][1] -= int(self.patch_size[axis] // 2)
-
-            for chunk_patch_indices in sampler:
-                image_patch_indices = chunk_patch_indices + sampler_offset.reshape(-1, 1)
-                self.chunk_patches_dicts[chunk_id][str(image_patch_indices)] = {"patch_indices": image_patch_indices, "patch": None}
-
-    def append(self, patch, patch_indices, chunk_id):
+    def append(self, patch, patch_indices):
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
         :param patch_indices: The patch indices in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
         """
-        if chunk_id is None:
-            raise RuntimeError("The chunk ID must be given when the chunk size is set.")
-        if str(patch_indices) not in self.chunk_patches_dicts[chunk_id]:
-            raise RuntimeError("patch_indices_key not in self.chunk_patches_dicts[chunk_id]! patch_indices: {}. Offset for chunk_id {} is{}. unhashed_keys: {}".format(
-                patch_indices, chunk_id, self.chunk_sampler_offset[chunk_id], self.chunk_patches_dicts[chunk_id].keys()))
-        self.chunk_patches_dicts[chunk_id][str(patch_indices)]["patch"] = patch
-        if self.is_chunk_complete(chunk_id):
-            # print("chunk_id: ", chunk_id)
-            # self.process_chunk(chunk_id)
-            self.executor.submit(self.process_chunk, chunk_id)
+        patch_h = patch
+        patch_indices_s = patch_indices
+
+        if self.weight_patch_h is None:
+            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.add_non_spatial_dims(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
+
+        self.patch_chunk_dict[str(patch_indices_s)]["patch"].create(patch_h)
+
+        for chunk_id in self.patch_chunk_dict[str(patch_indices_s)]["chunks"]:
+            self.chunk_patch_dict[chunk_id][str(patch_indices_s)]["status"] = PatchStatus.FILLED
+            if self.is_chunk_complete(chunk_id):
+                if isinstance(self.output_h, zarr.core.Array):
+                    warnings.warn("Ouput is a Zarr array. Switching to single threading for chunk processing. See issue #39 for more information.") # If issue is solved remove zarr and warnings import statements
+                    self.process_chunk(chunk_id)
+                else:
+                    self.executor.submit(self.process_chunk, chunk_id)
 
     def is_chunk_complete(self, chunk_id):
-        # Check if all self.chunk_patches_dicts[chunk_id] values are not None
-        for value in self.chunk_patches_dicts[chunk_id].values():
-            if value["patch"] is None:
+        for patch_data in self.chunk_patch_dict[chunk_id].values():
+            if patch_data["status"] != PatchStatus.FILLED:
                 return False
         return True
 
     def process_chunk(self, chunk_id):
-        # If they are all not None, create a softmax array of size chunk_size with number classes as channels
-        patch_shape = list(self.chunk_patches_dicts[chunk_id].values())[0]["patch"].shape
-        chunk_size = utils.add_non_spatial_dims(self.chunk_size, patch_shape, self.spatial_size, self.spatial_first)
-        chunk = np.zeros(chunk_size, dtype=self.chunk_dtype)
-        # Weight each patch during insertion
-        sampler_offset = self.chunk_sampler_offset[chunk_id].reshape(-1, 1)
+        patch_size_h = list(self.chunk_patch_dict[chunk_id].values())[0]["patch"].shape
+        chunk_size_s = self.chunk_sampler.patch_sizes_s[chunk_id]
+        chunk_size_h = utils.add_non_spatial_dims(chunk_size_s, patch_size_h, self.spatial_first)
+        chunk_h = np.zeros(chunk_size_h, dtype=self.chunk_dtype)
         if self.softmax_dim is None:
-            weight_map = np.zeros(chunk_size)
-        for patch_dict in self.chunk_patches_dicts[chunk_id].values():
-            image_patch_indices, patch = patch_dict["patch_indices"], patch_dict["patch"]
-            chunk_patch_indices = image_patch_indices - sampler_offset
-            slices = utils.add_non_spatial_indices(chunk, chunk_patch_indices, self.spatial_size, self.spatial_first)
-            chunk[slicer(chunk, slices)] += patch.astype(chunk.dtype) * self.weight_patch.astype(chunk.dtype)
+            weight_map_h = np.zeros(chunk_size_h)
+        for patch_data in self.chunk_patch_dict[chunk_id].values():
+            valid_patch_indices_s = patch_data["valid_patch_indices"]
+            crop_patch_indices_s = patch_data["crop_patch_indices"]
+            patch_h = patch_data["patch"].data
+            patch_data["patch"] = None
+            patch_data["status"] = PatchStatus.COMPLETED
+            crop_patch_slices_h = utils.add_non_spatial_indices(crop_patch_indices_s, chunk_h, self.spatial_first)
+            valid_patch_slices_h = utils.add_non_spatial_indices(valid_patch_indices_s, chunk_h, self.spatial_first)
+            valid_patch_h = patch_h[slicer(patch_h, crop_patch_slices_h)]
+            valid_weight_patch_h = self.weight_patch_h[slicer(self.weight_patch_h, crop_patch_slices_h)]
+            chunk_h[slicer(chunk_h, valid_patch_slices_h)] += valid_patch_h.astype(chunk_h.dtype) * valid_weight_patch_h.astype(chunk_h.dtype)
             if self.softmax_dim is None:
-                slices = utils.add_non_spatial_indices(self.output, chunk_patch_indices, self.spatial_size, self.spatial_first)
-                weight_map[slicer(weight_map, slices)] += self.weight_patch
+                weight_map_h[slicer(weight_map_h, valid_patch_slices_h)] += valid_weight_patch_h
         if self.softmax_dim is None:
-            chunk = chunk / weight_map.astype(chunk.dtype)
-            chunk = np.nan_to_num(chunk)
+            chunk_h = chunk_h / weight_map_h.astype(chunk_h.dtype)
+            chunk_h = np.nan_to_num(chunk_h)
         else:
             # Argmax the softmax chunk
-            chunk = chunk.argmax(axis=self.softmax_dim).astype(np.uint16)
-        # Crop the chunk
-        crop_indices = self.chunk_indices[chunk_id] - sampler_offset
-        crop_indices = utils.add_non_spatial_indices(chunk, crop_indices, self.spatial_size, self.spatial_first)
-        chunk = chunk[slicer(chunk, crop_indices)]
-        # Write the chunk into the global output
-        crop_indices = self.chunk_indices[chunk_id]
-        crop_indices = utils.add_non_spatial_indices(self.output, crop_indices, self.spatial_size, self.spatial_first)
-        self.output[slicer(self.output, crop_indices)] = chunk.astype(self.output.dtype)
-        # Set all self.chunk_patches_dicts[chunk_id] values to None
-        for key in self.chunk_patches_dicts[chunk_id].keys():
-            self.chunk_patches_dicts[chunk_id][key]["patch"] = None
+            chunk_h = chunk_h.argmax(axis=self.softmax_dim).astype(np.uint16)
+        chunk_indices_h = self.chunk_sampler.__getitem__(chunk_id)
+        chunk_indices_h = utils.add_non_spatial_indices(chunk_indices_h, self.output_h, self.spatial_first)
+        self.output_h[slicer(self.output_h, chunk_indices_h)] = chunk_h.astype(self.output_h.dtype)
 
     def get_output(self, inplace: bool = False):
         self.executor.shutdown(wait=True)
-        return self.output
+        return self.output_h

@@ -197,7 +197,7 @@ class TestBasicGridSampler(unittest.TestCase):
                 _patch_size = patch.shape[:len(patch_size)]
             self.assertEqual(_patch_size, patch_size, "patch.shape: {}, patch_size: {}, patch indices: {}".format(patch.shape, patch_size, patch_indices))
             result[slicer(result, patch_indices)] = 1
-            patch_indices = utils.add_non_spatial_indices(image, patch_indices, spatial_size, spatial_first)
+            patch_indices = utils.add_non_spatial_indices(patch_indices, image, spatial_first)
             np.testing.assert_array_equal(patch, image[slicer(image, patch_indices)], err_msg="image shape: {}, patch shape: {}, patch indices: {}".format(image.shape, patch.shape, patch_indices))
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(

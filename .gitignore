@@ -5,4 +5,4 @@ samplify.egg-info/
 
 samplify/__pycache__/
 
-tests/__pycache__/
+__pycache__/

@@ -110,8 +110,8 @@ class Aggregator:
             raise RuntimeError("The given sampling mode ({}) is not compatible with chunk sampling.".format(self.mode))
         return aggregator
 
-    def append(self, patch, patch_indices):
-        self.aggregator.append(patch, patch_indices)
+    def append(self, patch, patch_bbox):
+        self.aggregator.append(patch, patch_bbox)
 
     def get_output(self, inplace: bool = False):
         output_h = self.aggregator.get_output(inplace)
@@ -121,8 +121,8 @@ class Aggregator:
 
     def unpad_output(self, output_h, pad_width_h):
         pad_width_h[:, 1] *= -1
-        crop_slices_h = slicer(output_h, pad_width_h)
-        output_h = output_h[crop_slices_h]
+        crop_bbox_h = slicer(output_h, pad_width_h)
+        output_h = output_h[crop_bbox_h]
         return output_h
 
 
@@ -150,23 +150,23 @@ class _Aggregator:
         self.weight_map_s = weight_map_s
         self.computed_inplace = False
 
-    def append(self, patch, patch_indices):
+    def append(self, patch, patch_bbox):
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
-        :param patch_indices: The patch indices in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
+        :param patch_bbox: The patch bbox in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
         """
         patch_h = patch
-        patch_indices_s = patch_indices
+        patch_bbox_s = patch_bbox
 
         if self.computed_inplace:
             raise RuntimeError("get_output() has already been called with inplace=True. Therefore, no further patches can be appended.")
         if self.weight_patch_h is None:
             self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.add_non_spatial_dims(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
-        patch_indices_h = utils.add_non_spatial_indices(patch_indices_s, self.output_h, self.spatial_first)
-        self.output_h[slicer(self.output_h, patch_indices_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
+        patch_bbox_h = utils.add_non_spatial_bbox_dims(patch_bbox_s, self.output_h, self.spatial_first)
+        self.output_h[slicer(self.output_h, patch_bbox_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
         if self.weight_map_s is not None:
-            self.weight_map_s[slicer(self.weight_map_s, patch_indices_s)][...] += self.weight_patch_s
+            self.weight_map_s[slicer(self.weight_map_s, patch_bbox_s)][...] += self.weight_patch_s
 
     def get_output(self, inplace: bool = False):
         """
@@ -211,7 +211,7 @@ class _ChunkAggregator(_Aggregator):
         self.chunk_size_s = chunk_size_s
         self.chunk_dtype = self.set_chunk_dtype()
         self.mode = mode
-        self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict = self.compute_indices()
+        self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict = self.compute_patches()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def set_chunk_dtype(self):
@@ -220,45 +220,45 @@ class _ChunkAggregator(_Aggregator):
         else:
             return np.float32
 
-    def compute_indices(self):
+    def compute_patches(self):
         patch_sampler = self.sampler
         chunk_sampler = _AdaptiveGridSampler(spatial_size_s=self.spatial_size_s, patch_size_s=self.chunk_size_s, patch_overlap_s=self.chunk_size_s)
         chunk_patch_dict = defaultdict(dict)
         patch_chunk_dict = defaultdict(dict)
         
         for idx in range(len(patch_sampler)):
-            patch_indices_s = patch_sampler._get_indices(idx)
+            patch_bbox_s = patch_sampler._get_bbox(idx)
             patch_h = utils.LazyArray()
-            patch_chunk_dict[str(patch_indices_s)]["patch"] = patch_h
-            patch_chunk_dict[str(patch_indices_s)]["chunks"] = []
-            for chunk_id, chunk_indices_s in enumerate(chunk_sampler):
-                if utils.is_overlapping(chunk_indices_s, patch_indices_s):
+            patch_chunk_dict[str(patch_bbox_s)]["patch"] = patch_h
+            patch_chunk_dict[str(patch_bbox_s)]["chunks"] = []
+            for chunk_id, chunk_bbox_s in enumerate(chunk_sampler):
+                if utils.is_overlapping(chunk_bbox_s, patch_bbox_s):
                     # Shift to chunk coordinate system
-                    valid_patch_indices_s = patch_indices_s - np.array([chunk_indices_s[:, 0], chunk_indices_s[:, 0]]).T
-                    # Crop patch indices to chunk bounds
-                    valid_patch_indices_s = np.array([[max(valid_patch_indices_s[i][0], 0), min(valid_patch_indices_s[i][1], chunk_indices_s[i][1] - chunk_indices_s[i][0])] for i in range(len(chunk_indices_s))])
-                    crop_patch_indices_s = valid_patch_indices_s + np.array([chunk_indices_s[:, 0], chunk_indices_s[:, 0]]).T - np.array([patch_indices_s[:, 0], patch_indices_s[:, 0]]).T
-                    chunk_patch_dict[chunk_id][str(patch_indices_s)] = {"valid_patch_indices": valid_patch_indices_s, "crop_patch_indices": crop_patch_indices_s, "patch": patch_h, "status": PatchStatus.EMPTY}
-                    patch_chunk_dict[str(patch_indices_s)]["chunks"].append(chunk_id)
+                    valid_patch_bbox_s = patch_bbox_s - np.array([chunk_bbox_s[:, 0], chunk_bbox_s[:, 0]]).T
+                    # Crop patch bbox to chunk bounds
+                    valid_patch_bbox_s = np.array([[max(valid_patch_bbox_s[i][0], 0), min(valid_patch_bbox_s[i][1], chunk_bbox_s[i][1] - chunk_bbox_s[i][0])] for i in range(len(chunk_bbox_s))])
+                    crop_patch_bbox_s = valid_patch_bbox_s + np.array([chunk_bbox_s[:, 0], chunk_bbox_s[:, 0]]).T - np.array([patch_bbox_s[:, 0], patch_bbox_s[:, 0]]).T
+                    chunk_patch_dict[chunk_id][str(patch_bbox_s)] = {"valid_patch_bbox": valid_patch_bbox_s, "crop_patch_bbox": crop_patch_bbox_s, "patch": patch_h, "status": PatchStatus.EMPTY}
+                    patch_chunk_dict[str(patch_bbox_s)]["chunks"].append(chunk_id)
 
         return chunk_sampler, chunk_patch_dict, patch_chunk_dict
 
-    def append(self, patch, patch_indices):
+    def append(self, patch, patch_bbox):
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
-        :param patch_indices: The patch indices in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
+        :param patch_bbox: The patch bbox in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
         """
         patch_h = patch
-        patch_indices_s = patch_indices
+        patch_bbox_s = patch_bbox
 
         if self.weight_patch_h is None:
             self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.add_non_spatial_dims(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
 
-        self.patch_chunk_dict[str(patch_indices_s)]["patch"].create(patch_h)
+        self.patch_chunk_dict[str(patch_bbox_s)]["patch"].create(patch_h)
 
-        for chunk_id in self.patch_chunk_dict[str(patch_indices_s)]["chunks"]:
-            self.chunk_patch_dict[chunk_id][str(patch_indices_s)]["status"] = PatchStatus.FILLED
+        for chunk_id in self.patch_chunk_dict[str(patch_bbox_s)]["chunks"]:
+            self.chunk_patch_dict[chunk_id][str(patch_bbox_s)]["status"] = PatchStatus.FILLED
             if self.is_chunk_complete(chunk_id):
                 if isinstance(self.output_h, zarr.core.Array):
                     warnings.warn("Ouput is a Zarr array. Switching to single threading for chunk processing. See issue #39 for more information.") # If issue is solved remove zarr and warnings import statements
@@ -280,27 +280,27 @@ class _ChunkAggregator(_Aggregator):
         if self.softmax_dim is None:
             weight_map_h = np.zeros(chunk_size_h)
         for patch_data in self.chunk_patch_dict[chunk_id].values():
-            valid_patch_indices_s = patch_data["valid_patch_indices"]
-            crop_patch_indices_s = patch_data["crop_patch_indices"]
+            valid_patch_bbox_s = patch_data["valid_patch_bbox"]
+            crop_patch_bbox_s = patch_data["crop_patch_bbox"]
             patch_h = patch_data["patch"].data
             patch_data["patch"] = None
             patch_data["status"] = PatchStatus.COMPLETED
-            crop_patch_slices_h = utils.add_non_spatial_indices(crop_patch_indices_s, chunk_h, self.spatial_first)
-            valid_patch_slices_h = utils.add_non_spatial_indices(valid_patch_indices_s, chunk_h, self.spatial_first)
-            valid_patch_h = patch_h[slicer(patch_h, crop_patch_slices_h)]
-            valid_weight_patch_h = self.weight_patch_h[slicer(self.weight_patch_h, crop_patch_slices_h)]
-            chunk_h[slicer(chunk_h, valid_patch_slices_h)] += valid_patch_h.astype(chunk_h.dtype) * valid_weight_patch_h.astype(chunk_h.dtype)
+            crop_patch_bbox_h = utils.add_non_spatial_bbox_dims(crop_patch_bbox_s, chunk_h, self.spatial_first)
+            valid_patch_bbox_h = utils.add_non_spatial_bbox_dims(valid_patch_bbox_s, chunk_h, self.spatial_first)
+            valid_patch_h = patch_h[slicer(patch_h, crop_patch_bbox_h)]
+            valid_weight_patch_h = self.weight_patch_h[slicer(self.weight_patch_h, crop_patch_bbox_h)]
+            chunk_h[slicer(chunk_h, valid_patch_bbox_h)] += valid_patch_h.astype(chunk_h.dtype) * valid_weight_patch_h.astype(chunk_h.dtype)
             if self.softmax_dim is None:
-                weight_map_h[slicer(weight_map_h, valid_patch_slices_h)] += valid_weight_patch_h
+                weight_map_h[slicer(weight_map_h, valid_patch_bbox_h)] += valid_weight_patch_h
         if self.softmax_dim is None:
             chunk_h = chunk_h / weight_map_h.astype(chunk_h.dtype)
             chunk_h = np.nan_to_num(chunk_h)
         else:
             # Argmax the softmax chunk
             chunk_h = chunk_h.argmax(axis=self.softmax_dim).astype(np.uint16)
-        chunk_indices_h = self.chunk_sampler.__getitem__(chunk_id)
-        chunk_indices_h = utils.add_non_spatial_indices(chunk_indices_h, self.output_h, self.spatial_first)
-        self.output_h[slicer(self.output_h, chunk_indices_h)] = chunk_h.astype(self.output_h.dtype)
+        chunk_bbox_h = self.chunk_sampler.__getitem__(chunk_id)
+        chunk_bbox_h = utils.add_non_spatial_bbox_dims(chunk_bbox_h, self.output_h, self.spatial_first)
+        self.output_h[slicer(self.output_h, chunk_bbox_h)] = chunk_h.astype(self.output_h.dtype)
 
     def get_output(self, inplace: bool = False):
         self.executor.shutdown(wait=True)

@@ -30,13 +30,13 @@ def example():
 
     # Run inference
     with torch.no_grad():
-        for patch, patch_indices, chunk_id in tqdm(loader):
+        for patch, patch_bbox, chunk_id in tqdm(loader):
             patch_prediction = model(patch)
             patch_prediction = patch_prediction.cpu().numpy()
-            patch_indices = patch_indices.cpu().numpy()
+            patch_bbox = patch_bbox.cpu().numpy()
             chunk_id = chunk_id.cpu().numpy()
             for i in range(len(patch_prediction)):
-                aggregator.append(patch_prediction[i], patch_indices[i], chunk_id[i])
+                aggregator.append(patch_prediction[i], patch_bbox[i], chunk_id[i])
 
     # Finalize aggregation
     prediction = aggregator.get_output()
@@ -51,13 +51,13 @@ class SamplerDataset(Dataset):
     def __getitem__(self, idx):
         output = self.sampler.__getitem__(idx)
         if not self.is_chunked:
-            patch, patch_indices = output
+            patch, patch_bbox = output
             patch = patch.astype(np.float32)
-            return patch, patch_indices
+            return patch, patch_bbox
         else:
-            patch, patch_indices, chunk_id = output
+            patch, patch_bbox, chunk_id = output
             patch = patch.astype(np.float32)
-            return patch, patch_indices, chunk_id
+            return patch, patch_bbox, chunk_id
 
     def __len__(self):
         return len(self.sampler)

@@ -10,7 +10,7 @@ class GridSampler:
                  image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = 'sample_edge', pad_kwargs: dict = None):
         """
         TODO description
-        If no image is given then only patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
+        If no image is given then only patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
 
         :param image: The image in an array-like format (Numpy, Samplify.Subject, Tensor, Zarr, Dask, ...) that can be memory-mapped.
         Samplify.subject is directly supported and will sample the same patch from all stored images.
@@ -115,8 +115,8 @@ class GridSampler:
     def __next__(self):
         return self.sampler.__next__()
     
-    def _get_indices(self, idx):
-        return self.sampler._get_indices(idx)
+    def _get_bbox(self, idx):
+        return self.sampler._get_bbox(idx)
 
 
 class _CropGridSampler:
@@ -127,12 +127,12 @@ class _CropGridSampler:
         An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have overlap if patch_overlap is specified.
         If patch_size is not a multiple of image_size then the remainder part of the image is not sampled.
         The grid sampler only returns image patches if image is set.
-        Otherwise, only the patch indices w_ini, w_fin, h_ini, h_fin, d_ini, d_fin are returned. They can be used to extract the patch from the image like this:
+        Otherwise, only the patch bbox w_ini, w_fin, h_ini, h_fin, d_ini, d_fin are returned. They can be used to extract the patch from the image like this:
         img = img[w_ini:w_fin, h_ini:h_fin, d_ini:d_fin] (Example for a 3D image)
         Requiring only size parameters instead of the actual image makes the grid sampler file format independent if desired.
 
         :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
-        If None then patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
+        If None then patch bbox (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
         :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param patch_overlap: The shape of the patch overlap without batch and channel dimensions. If None then the patch overlap is equal to patch_size.
@@ -142,29 +142,29 @@ class _CropGridSampler:
         self.spatial_first = spatial_first
         self.patch_size_s = patch_size_s
         self.patch_overlap_s = patch_overlap_s
-        self.indices_s, self.patch_sizes_s = self.compute_patches()
+        self.patch_positions_s, self.patch_sizes_s = self.compute_patches()
 
     def compute_patches(self):
         n_axis_s = len(self.spatial_size_s)
         stop_s = [self.spatial_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
-        axis_indices_s = [np.arange(0, stop_s[axis], self.patch_overlap_s[axis]) for axis in range(n_axis_s)]
-        patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_indices_s[axis]) for axis in range(n_axis_s)]
-        axis_indices_s = np.meshgrid(*axis_indices_s, indexing='ij')
+        axis_positions_s = [np.arange(0, stop_s[axis], self.patch_overlap_s[axis]) for axis in range(n_axis_s)]
+        patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
         patch_sizes_s = np.meshgrid(*patch_sizes_s, indexing='ij')
-        indices_s = np.column_stack([axis_indices_s[axis].ravel() for axis in range(n_axis_s)])
+        patch_positions_s = np.column_stack([axis_positions_s[axis].ravel() for axis in range(n_axis_s)])
         patch_sizes_s = np.column_stack([patch_sizes_s[axis].ravel() for axis in range(n_axis_s)])
-        return indices_s, patch_sizes_s
+        return patch_positions_s, patch_sizes_s
 
     def __iter__(self):
         self.index = 0
         return self
 
     def __len__(self):
-        return len(self.indices_s)
+        return len(self.patch_positions_s)
 
     def __getitem__(self, idx):
-        patch_indices_s = self._get_indices(idx)
-        patch_result = self.get_patch_result(patch_indices_s)
+        patch_bbox_s = self._get_bbox(idx)
+        patch_result = self.get_patch_result(patch_bbox_s)
         return patch_result
 
     def __next__(self):
@@ -175,27 +175,21 @@ class _CropGridSampler:
         else:
             raise StopIteration
         
-    def _get_indices(self, idx):
-        indices_s = self.indices_s[idx]
-        patch_indices_s = np.zeros(len(indices_s) * 2, dtype=int).reshape(-1, 2)
-        for axis in range(len(indices_s)):
-            patch_indices_s[axis][0] = indices_s[axis]
-            patch_indices_s[axis][1] = indices_s[axis] + self.patch_sizes_s[idx][axis]
-        return patch_indices_s
+    def _get_bbox(self, idx):
+        patch_position_s = self.patch_positions_s[idx]
+        patch_bbox_s = np.zeros(len(patch_position_s) * 2, dtype=int).reshape(-1, 2)
+        for axis in range(len(patch_bbox_s)):
+            patch_bbox_s[axis][0] = patch_position_s[axis]
+            patch_bbox_s[axis][1] = patch_position_s[axis] + self.patch_sizes_s[idx][axis]
+        return patch_bbox_s
 
-    def get_patch_result(self, patch_indices_s):
+    def get_patch_result(self, patch_bbox_s):
         if self.image_h is not None and not isinstance(self.image_h, dict):
-            slices_h = utils.add_non_spatial_indices(patch_indices_s, self.image_h, self.spatial_first)
-            patch_h = self.image_h[slicer(self.image_h, slices_h)]
-            return patch_h, patch_indices_s
-        elif self.image_h is not None and isinstance(self.image_h, dict):
-            patch_dict = {}
-            for key in self.image_h.keys():
-                slices_h = utils.add_non_spatial_indices(patch_indices_s, self.image_h[key], self.spatial_first)
-                patch_dict[key] = self.image_h[key][slicer(self.image_h[key], slices_h)]
-            return patch_dict, patch_indices_s
+            patch_bbox_h = utils.add_non_spatial_bbox_dims(patch_bbox_s, self.image_h, self.spatial_first)
+            patch_h = self.image_h[slicer(self.image_h, patch_bbox_h)]
+            return patch_h, patch_bbox_s
         else:
-            return patch_indices_s
+            return patch_bbox_s
 
 
 class _EdgeGridSampler(_CropGridSampler):
@@ -214,12 +208,12 @@ class _EdgeGridSampler(_CropGridSampler):
         |X  X  X  X  X  X  X |
         ----------------------
         The grid sampler only returns image patches if image is set.
-        Otherwise, only the patch indices w_ini, w_fin, h_ini, h_fin, d_ini, d_fin are returned. They can be used to extract the patch from the image like this:
+        Otherwise, only the patch bbox w_ini, w_fin, h_ini, h_fin, d_ini, d_fin are returned. They can be used to extract the patch from the image like this:
         img = img[w_ini:w_fin, h_ini:h_fin, d_ini:d_fin] (Example for a 3D image)
         Requiring only size parameters instead of the actual image makes the grid sampler file format independent if desired.
 
         :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
-        If None then patch indices (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
+        If None then patch bbox (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
         :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param patch_overlap: The shape of the patch overlap without batch and channel dimensions. If None then the patch overlap is equal to patch_size.
@@ -229,17 +223,17 @@ class _EdgeGridSampler(_CropGridSampler):
     def compute_patches(self):
         n_axis_s = len(self.spatial_size_s)
         stop_s = [self.spatial_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
-        axis_indices_s = [np.arange(0, stop_s[axis], self.patch_overlap_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = [np.arange(0, stop_s[axis], self.patch_overlap_s[axis]) for axis in range(n_axis_s)]
         for axis in range(n_axis_s):
-            if axis_indices_s[axis][-1] != self.spatial_size_s[axis] - self.patch_size_s[axis]:
-                axis_indices_s[axis] = np.append(axis_indices_s[axis], [self.spatial_size_s[axis] - self.patch_size_s[axis]],
+            if axis_positions_s[axis][-1] != self.spatial_size_s[axis] - self.patch_size_s[axis]:
+                axis_positions_s[axis] = np.append(axis_positions_s[axis], [self.spatial_size_s[axis] - self.patch_size_s[axis]],
                                                axis=0)
-        patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_indices_s[axis]) for axis in range(n_axis_s)]
-        axis_indices_s = np.meshgrid(*axis_indices_s, indexing='ij')
+        patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
         patch_sizes_s = np.meshgrid(*patch_sizes_s, indexing='ij')
-        indices_s = np.column_stack([axis_indices_s[axis].ravel() for axis in range(n_axis_s)])
+        patch_positions_s = np.column_stack([axis_positions_s[axis].ravel() for axis in range(n_axis_s)])
         patch_sizes_s = np.column_stack([patch_sizes_s[axis].ravel() for axis in range(n_axis_s)])
-        return indices_s, patch_sizes_s
+        return patch_positions_s, patch_sizes_s
 
 
 class _AdaptiveGridSampler(_CropGridSampler):
@@ -254,19 +248,19 @@ class _AdaptiveGridSampler(_CropGridSampler):
     def compute_patches(self):
         n_axis_s = len(self.spatial_size_s)
         stop = [self.spatial_size_s[axis] for axis in range(n_axis_s)]
-        axis_indices_s = [np.arange(0, stop[axis], self.patch_overlap_s[axis]) for axis in range(n_axis_s)]
-        patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_indices_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = [np.arange(0, stop[axis], self.patch_overlap_s[axis]) for axis in range(n_axis_s)]
+        patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
         for axis in range(n_axis_s):
-            for index in range(len(axis_indices_s[axis])):
+            for index in range(len(axis_positions_s[axis])):
                 # If part of this patch is extending beyonf the image
-                if self.spatial_size_s[axis] < axis_indices_s[axis][index] + patch_sizes_s[axis][index]:
-                    patch_sizes_s[axis][index] = self.spatial_size_s[axis] - axis_indices_s[axis][index]
+                if self.spatial_size_s[axis] < axis_positions_s[axis][index] + patch_sizes_s[axis][index]:
+                    patch_sizes_s[axis][index] = self.spatial_size_s[axis] - axis_positions_s[axis][index]
                     # If there is a minimum patch size, give the patch at least minimum patch size
                     if self.min_patch_size_s is not None and patch_sizes_s[axis][index] < self.min_patch_size_s[axis]:
-                        axis_indices_s[axis][index] = self.spatial_size_s[axis] - self.min_patch_size_s[axis]
+                        axis_positions_s[axis][index] = self.spatial_size_s[axis] - self.min_patch_size_s[axis]
                         patch_sizes_s[axis][index] = self.min_patch_size_s[axis]                
-        axis_indices_s = np.meshgrid(*axis_indices_s, indexing='ij')
+        axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
         patch_sizes_s = np.meshgrid(*patch_sizes_s, indexing='ij')
-        indices_s = np.column_stack([axis_indices_s[axis].ravel() for axis in range(n_axis_s)])
+        positions_s = np.column_stack([axis_positions_s[axis].ravel() for axis in range(n_axis_s)])
         patch_sizes_s = np.column_stack([patch_sizes_s[axis].ravel() for axis in range(n_axis_s)])
-        return indices_s, patch_sizes_s
+        return positions_s, patch_sizes_s

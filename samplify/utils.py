@@ -27,15 +27,15 @@ class LazyArray:
         self.data[key] = value
 
 
-def add_non_spatial_indices(patch_indices_s, image_h, spatial_first):
-    dims_n = len(image_h.shape) - len(patch_indices_s[:, 0])
+def add_non_spatial_bbox_dims(bbox_s, image_h, spatial_first):
+    dims_n = len(image_h.shape) - len(bbox_s[:, 0])
     if spatial_first:
-        slices_h = [index_pair.tolist() for index_pair in patch_indices_s]
-        slices_h.extend([[None]] * dims_n)
+        bbox_h = [index_pair.tolist() for index_pair in bbox_s]
+        bbox_h.extend([[None]] * dims_n)
     else:
-        slices_h = [[None]] * dims_n
-        slices_h.extend([index_pair.tolist() for index_pair in patch_indices_s])
-    return slices_h
+        bbox_h = [[None]] * dims_n
+        bbox_h.extend([index_pair.tolist() for index_pair in bbox_s])
+    return bbox_h
 
 
 def add_non_spatial_dims(data_size1_s, data_size2_h, spatial_first):

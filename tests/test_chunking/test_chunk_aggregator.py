@@ -206,12 +206,12 @@ class TestChunkAggregator(unittest.TestCase):
         sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first_sampler, mode="sample_edge")
         aggregator = Aggregator(sampler=sampler, output_size=output_size, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
-        for i, (patch, patch_indices) in enumerate(sampler):
+        for i, (patch, patch_bbox) in enumerate(sampler):
             if multiply_elements_by_two:
                 _patch = patch * 2
             else:
                 _patch = patch
-            aggregator.append(_patch, patch_indices)
+            aggregator.append(_patch, patch_bbox)
 
         output1 = aggregator.get_output()
 
@@ -227,12 +227,12 @@ class TestChunkAggregator(unittest.TestCase):
         sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first_sampler, mode="sample_edge")
         aggregator = Aggregator(sampler=sampler, output=output, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
-        for i, (patch, patch_indices) in enumerate(sampler):
+        for i, (patch, patch_bbox) in enumerate(sampler):
             if multiply_elements_by_two:
                 _patch = patch * 2
             else:
                 _patch = patch
-            aggregator.append(_patch, patch_indices)
+            aggregator.append(_patch, patch_bbox)
 
         output2 = aggregator.get_output()
 

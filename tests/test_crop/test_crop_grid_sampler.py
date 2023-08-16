@@ -190,15 +190,15 @@ class TestBasicGridSampler(unittest.TestCase):
         result = np.zeros(result_size)
         sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_crop")
 
-        for patch, patch_indices in sampler:
+        for patch, patch_bbox in sampler:
             if not spatial_first:
                 _patch_size = patch.shape[-len(patch_size):]
             else:
                 _patch_size = patch.shape[:len(patch_size)]
-            self.assertEqual(_patch_size, patch_size, "patch.shape: {}, patch_size: {}, patch indices: {}".format(patch.shape, patch_size, patch_indices))
-            result[slicer(result, patch_indices)] = 1
-            patch_indices = utils.add_non_spatial_indices(patch_indices, image, spatial_first)
-            np.testing.assert_array_equal(patch, image[slicer(image, patch_indices)], err_msg="image shape: {}, patch shape: {}, patch indices: {}".format(image.shape, patch.shape, patch_indices))
+            self.assertEqual(_patch_size, patch_size, "patch.shape: {}, patch_size: {}, patch bbox: {}".format(patch.shape, patch_size, patch_bbox))
+            result[slicer(result, patch_bbox)] = 1
+            patch_bbox = utils.add_non_spatial_bbox_dims(patch_bbox, image, spatial_first)
+            np.testing.assert_array_equal(patch, image[slicer(image, patch_bbox)], err_msg="image shape: {}, patch shape: {}, patch bbox: {}".format(image.shape, patch.shape, patch_bbox))
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
             np.sum(result), result.size, result.shape, image.shape, patch_size, patch_size
@@ -208,8 +208,8 @@ class TestBasicGridSampler(unittest.TestCase):
         result = np.zeros(result_size)
         sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=spatial_first, mode="sample_crop")
 
-        for patch_indices in sampler:
-            result[slicer(result, patch_indices)] = 1
+        for patch_bbox in sampler:
+            result[slicer(result, patch_bbox)] = 1
 
         self.assertEqual(np.sum(result), result.size, "result sum: {}, result size: {}, result shape: {}, image shape: {}, patch shape: {}, patch_overlap: {}".format(
             np.sum(result), result.size, result.shape, image.shape, patch_size, patch_size

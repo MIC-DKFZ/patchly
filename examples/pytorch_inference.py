@@ -10,10 +10,10 @@ class ExampleDataset(Dataset):
 
     def __getitem__(self, idx):
         # Get patch
-        patch, patch_indices = self.sampler.__getitem__(idx)
+        patch, patch_bbox = self.sampler.__getitem__(idx)
         # Preprocess patch
         patch = patch.transpose(2, 0, 1)
-        return patch, patch_indices
+        return patch, patch_bbox
 
     def __len__(self):
         return len(self.sampler)
@@ -31,10 +31,10 @@ aggregator = Aggregator(sampler=sampler, output_size=(8, 1000, 1000), spatial_fi
 
 # Run inference
 with torch.no_grad():
-    for patch, patch_indices in loader:
+    for patch, patch_bbox in loader:
         patch_prediction = model(patch)
         for i in range(len(patch_prediction)):
-            aggregator.append(patch_prediction[i].cpu().numpy(), patch_indices[i].cpu().numpy())
+            aggregator.append(patch_prediction[i].cpu().numpy(), patch_bbox[i].cpu().numpy())
 
 # Finalize aggregation
 prediction = aggregator.get_output()

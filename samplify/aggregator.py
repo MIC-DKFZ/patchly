@@ -61,7 +61,9 @@ class Aggregator:
             else:
                 weight_map_size_s = self.chunk_size_s
             if weights_s == 'avg':
-                weight_map_s = np.zeros(weight_map_size_s, dtype=np.uint16)
+                # uint8 saves memory, but might be problematic when using a very small patch overlap
+                # Consider providing your own uint16 weight map when working with a very small patch overlap
+                weight_map_s = np.zeros(weight_map_size_s, dtype=np.uint8)
             else:
                 weight_map_s = np.zeros(weight_map_size_s, dtype=np.float32)
         else:

@@ -1,9 +1,7 @@
 import unittest
 import numpy as np
 import zarr
-from samplify.sampler import GridSampler
-from samplify.aggregator import Aggregator
-from samplify.slicer import slicer
+from samplify import GridSampler, Aggregator, slicer, SamplingMode
 from scipy.ndimage.filters import gaussian_filter
 import copy
 
@@ -203,7 +201,7 @@ class TestChunkAggregator(unittest.TestCase):
             output_size = np.moveaxis(image.shape, softmax_dim, 0)[1:]
         
         # Test with output size
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode="sample_edge")
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_EDGE)
         aggregator = Aggregator(sampler=sampler, output_size=output_size, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):
@@ -224,7 +222,7 @@ class TestChunkAggregator(unittest.TestCase):
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode="sample_edge")
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_EDGE)
         aggregator = Aggregator(sampler=sampler, output=output, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):

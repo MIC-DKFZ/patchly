@@ -1,6 +1,5 @@
 import numpy as np
-from samplify.sampler import GridSampler
-from samplify.aggregator import Aggregator
+from samplify import GridSampler, Aggregator
 from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
 import torch
@@ -18,7 +17,7 @@ def example():
     chunk_size = (500, 500)
 
     # Init GridSampler
-    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=False, mode="sample_edge")
+    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=False)
     # Convert sampler into a PyTorch dataset
     loader = SamplerDataset(sampler)
     # Init dataloader

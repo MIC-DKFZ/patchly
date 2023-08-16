@@ -91,25 +91,24 @@ class Aggregator:
             raise RuntimeError("The chunk size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.chunk_size_s, self.spatial_size_s))
         if self.chunk_size_s is not None and np.any(self.patch_size_s >= self.chunk_size_s):
             raise RuntimeError("The patch size ({}) cannot be greater or equal to the chunk size ({}) in one or more dimensions.".format(self.patch_size_s, self.chunk_size_s))
+        if self.chunk_size_s is not None and len(self.spatial_size_s) != len(self.chunk_size_s):
+            raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({}).".format(self.chunk_size_s, self.spatial_size_s))
+        if self.mode.name.startswith('PAD_') and self.chunk_size_s is not None:
+            raise RuntimeError("The given sampling mode ({}) is not compatible with chunk sampling.".format(self.mode))
 
     def set_aggregator(self, sampler, output_h, softmax_dim):
-        if self.mode.startswith('sample_') and self.chunk_size_s is None:
+        if self.mode.name.startswith('SAMPLE_') and self.chunk_size_s is None:
             aggregator = _Aggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s,
                                   output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s, weight_map_s=self.weight_map_s)
-        elif self.mode.startswith('sample_') and self.chunk_size_s is not None:
+        elif self.mode.name.startswith('SAMPLE_') and self.chunk_size_s is not None:
             aggregator = _ChunkAggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, chunk_size_s=self.chunk_size_s,
-                                       output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s, mode=self.mode)
-        elif self.mode.startswith('pad_') and self.chunk_size_s is None:
+                                       output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s)
+        elif self.mode.name.startswith('PAD_') and self.chunk_size_s is None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        elif self.mode.startswith('pad_') and self.chunk_size_s is not None:
+        elif self.mode.name.startswith('PAD_') and self.chunk_size_s is not None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         else:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
-        if self.chunk_size_s is not None and len(self.spatial_size_s) != len(self.chunk_size_s):
-            raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({})."
-                               .format(self.chunk_size_s, self.spatial_size_s))
-        if self.mode.startswith('pad_') and self.chunk_size_s is not None:
-            raise RuntimeError("The given sampling mode ({}) is not compatible with chunk sampling.".format(self.mode))
         return aggregator
 
     def append(self, patch, patch_bbox):
@@ -197,7 +196,7 @@ class _Aggregator:
 class _ChunkAggregator(_Aggregator):
     def __init__(self, sampler: GridSampler, spatial_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_offset_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
                  output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True,
-                 softmax_dim: Optional[int] = None, weight_patch_s: npt.ArrayLike = None, mode: str = 'sample_edge'):
+                 softmax_dim: Optional[int] = None, weight_patch_s: npt.ArrayLike = None):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
@@ -212,7 +211,6 @@ class _ChunkAggregator(_Aggregator):
         self.patch_offset_s = patch_offset_s
         self.chunk_size_s = chunk_size_s
         self.chunk_dtype = self.set_chunk_dtype()
-        self.mode = mode
         self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict = self.compute_patches()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 

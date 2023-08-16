@@ -3,11 +3,19 @@ from samplify.slicer import slicer
 from samplify import utils
 from typing import Union, Optional, Tuple
 import numpy.typing as npt
+from enum import Enum
+
+
+class SamplingMode(Enum):
+    SAMPLE_EDGE = 1
+    SAMPLE_ADAPTIVE = 2
+    SAMPLE_CROP = 3
+    PAD_UNKNOWN = 4
 
 
 class GridSampler:
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_offset: Optional[Union[Tuple, npt.ArrayLike]] = None,
-                 image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: str = 'sample_edge', pad_kwargs: dict = None):
+                 image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_EDGE, pad_kwargs: dict = None):
         """
         TODO description
         If no image is given then only patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
@@ -60,17 +68,18 @@ class GridSampler:
         if self.patch_offset_s is not None and len(self.spatial_size_s) != len(self.patch_offset_s):
             raise RuntimeError("The dimensionality of the patch offset ({}) is required to be the same as the spatial size ({})."
                                .format(self.patch_offset_s, self.spatial_size_s))
-        if self.mode.startswith('pad_') and (self.image_h is None or not isinstance(self.image_h, np.ndarray)):
+        if self.mode.name.startswith('PAD_') and (self.image_h is None or not isinstance(self.image_h, np.ndarray)):
             raise RuntimeError("The given sampling mode ({}) requires the image to be given and as type np.ndarray.".format(self.mode))
         
     def create_sampler(self):
-        if self.mode == "sample_edge":
+        if self.mode == SamplingMode.SAMPLE_EDGE:
             sampler = _EdgeGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
-        elif self.mode == "sample_adaptive":
+        elif self.mode == SamplingMode.SAMPLE_ADAPTIVE:
             sampler = _AdaptiveGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
-        elif self.mode == "sample_crop":
+        elif self.mode == SamplingMode.SAMPLE_CROP:
             sampler = _CropGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
-        elif self.mode.startswith('pad_'):
+        elif self.mode.name.startswith('PAD_'):
+            raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
             self.pad_image()
             sampler = _CropGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
         else:

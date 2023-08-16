@@ -1,9 +1,7 @@
 import unittest
 import numpy as np
 import zarr
-from samplify.sampler import GridSampler
-from samplify.slicer import slicer
-from samplify import utils
+from samplify import GridSampler, slicer, utils, SamplingMode
 
 
 class TestBasicGridSampler(unittest.TestCase):
@@ -168,7 +166,7 @@ class TestBasicGridSampler(unittest.TestCase):
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
 
-        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode="sample_crop")
+        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode=SamplingMode.SAMPLE_CROP)
 
     def test_offset_size_larger_than_patch_size(self):
         patch_offset = (11, 10)
@@ -176,19 +174,19 @@ class TestBasicGridSampler(unittest.TestCase):
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
 
-        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, mode="sample_crop")
+        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, mode=SamplingMode.SAMPLE_CROP)
 
     def test_spatial_size_unequal_to_spatial_image_size(self):
         patch_size = (10, 10)
         spatial_size = (100, 100)
         image = np.random.random((200, 200))
 
-        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode="sample_crop")
+        self.assertRaises(RuntimeError, GridSampler, image=image, spatial_size=spatial_size, patch_size=patch_size, mode=SamplingMode.SAMPLE_CROP)
 
     def _test_sampler(self, image, result_size, spatial_size, patch_size, patch_offset=None, spatial_first=True):
         # Test with image
         result = np.zeros(result_size)
-        sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first, mode="sample_crop")
+        sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first, mode=SamplingMode.SAMPLE_CROP)
 
         for patch, patch_bbox in sampler:
             if not spatial_first:
@@ -206,7 +204,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros(result_size)
-        sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first, mode="sample_crop")
+        sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first, mode=SamplingMode.SAMPLE_CROP)
 
         for patch_bbox in sampler:
             result[slicer(result, patch_bbox)] = 1

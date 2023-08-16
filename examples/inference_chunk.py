@@ -18,7 +18,7 @@ def example():
     chunk_size = (500, 500)
 
     # Init GridSampler
-    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, chunk_size=chunk_size, spatial_first=False, mode="sample_edge")
+    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_overlap=patch_overlap, spatial_first=False, mode="sample_edge")
     # Convert sampler into a PyTorch dataset
     loader = SamplerDataset(sampler)
     # Init dataloader
@@ -26,17 +26,16 @@ def example():
     # Create an empty prediction passed to the aggregator
     prediction = np.zeros(spatial_size, dtype=np.uint8)
     # Init aggregator
-    aggregator = Aggregator(sampler=sampler, output=prediction, weights='gaussian', softmax_dim=1)
+    aggregator = Aggregator(sampler=sampler, output=prediction, chunk_size=chunk_size, weights='gaussian', softmax_dim=1)
 
     # Run inference
     with torch.no_grad():
-        for patch, patch_bbox, chunk_id in tqdm(loader):
+        for patch, patch_bbox in tqdm(loader):
             patch_prediction = model(patch)
             patch_prediction = patch_prediction.cpu().numpy()
             patch_bbox = patch_bbox.cpu().numpy()
-            chunk_id = chunk_id.cpu().numpy()
             for i in range(len(patch_prediction)):
-                aggregator.append(patch_prediction[i], patch_bbox[i], chunk_id[i])
+                aggregator.append(patch_prediction[i], patch_bbox[i])
 
     # Finalize aggregation
     prediction = aggregator.get_output()
@@ -46,18 +45,9 @@ def example():
 class SamplerDataset(Dataset):
     def __init__(self, sampler):
         self.sampler = sampler
-        self.is_chunked = self.sampler.chunk_size is not None
 
     def __getitem__(self, idx):
-        output = self.sampler.__getitem__(idx)
-        if not self.is_chunked:
-            patch, patch_bbox = output
-            patch = patch.astype(np.float32)
-            return patch, patch_bbox
-        else:
-            patch, patch_bbox, chunk_id = output
-            patch = patch.astype(np.float32)
-            return patch, patch_bbox, chunk_id
+        return self.sampler.__getitem__(idx)
 
     def __len__(self):
         return len(self.sampler)

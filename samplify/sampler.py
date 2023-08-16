@@ -127,12 +127,12 @@ class _CropGridSampler:
         An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have overlap if patch_overlap is specified.
         If patch_size is not a multiple of image_size then the remainder part of the image is not sampled.
         The grid sampler only returns image patches if image is set.
-        Otherwise, only the patch bbox w_ini, w_fin, h_ini, h_fin, d_ini, d_fin are returned. They can be used to extract the patch from the image like this:
-        img = img[w_ini:w_fin, h_ini:h_fin, d_ini:d_fin] (Example for a 3D image)
+        Otherwise, only the patch bbox w_start, w_end, h_start, h_end, d_start, d_end are returned. They can be used to extract the patch from the image like this:
+        img = img[w_start:w_end, h_start:h_end, d_start:d_end] (Example for a 3D image)
         Requiring only size parameters instead of the actual image makes the grid sampler file format independent if desired.
 
         :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
-        If None then patch bbox (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
+        If None then patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
         :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param patch_overlap: The shape of the patch overlap without batch and channel dimensions. If None then the patch overlap is equal to patch_size.
@@ -208,12 +208,12 @@ class _EdgeGridSampler(_CropGridSampler):
         |X  X  X  X  X  X  X |
         ----------------------
         The grid sampler only returns image patches if image is set.
-        Otherwise, only the patch bbox w_ini, w_fin, h_ini, h_fin, d_ini, d_fin are returned. They can be used to extract the patch from the image like this:
-        img = img[w_ini:w_fin, h_ini:h_fin, d_ini:d_fin] (Example for a 3D image)
+        Otherwise, only the patch bbox w_start, w_end, h_start, h_end, d_start, d_end are returned. They can be used to extract the patch from the image like this:
+        img = img[w_start:w_end, h_start:h_end, d_start:d_end] (Example for a 3D image)
         Requiring only size parameters instead of the actual image makes the grid sampler file format independent if desired.
 
         :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
-        If None then patch bbox (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...) are returned instead.
+        If None then patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
         :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param patch_overlap: The shape of the patch overlap without batch and channel dimensions. If None then the patch overlap is equal to patch_size.

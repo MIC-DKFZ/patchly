@@ -154,7 +154,7 @@ class _Aggregator:
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
-        :param patch_bbox: The patch bbox in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
+        :param patch_bbox: The patch bbox in the format of (w_start, w_end, h_start, h_end, d_start, d_end, ...).
         """
         patch_h = patch
         patch_bbox_s = patch_bbox
@@ -247,7 +247,7 @@ class _ChunkAggregator(_Aggregator):
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
-        :param patch_bbox: The patch bbox in the format of (w_ini, w_fin, h_ini, h_fin, d_ini, d_fin, ...).
+        :param patch_bbox: The patch bbox in the format of (w_start, w_end, h_start, h_end, d_start, d_end, ...).
         """
         patch_h = patch
         patch_bbox_s = patch_bbox

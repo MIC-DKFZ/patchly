@@ -31,8 +31,6 @@ def example():
     with torch.no_grad():
         for patch, patch_bbox in tqdm(loader):
             patch_prediction = model(patch)
-            patch_prediction = patch_prediction.cpu().numpy()
-            patch_bbox = patch_bbox.cpu().numpy()
             aggregator.append(patch_prediction, patch_bbox)
 
     # Finalize aggregation

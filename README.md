@@ -87,7 +87,7 @@ aggregator = Aggregator(sampler=sampler, output_size=(8, 1000, 1000), spatial_fi
 with torch.no_grad():
     for patch, patch_bbox in loader:
         patch_prediction = model(patch)
-        aggregator.append(patch_prediction.cpu().numpy(), patch_bbox.cpu().numpy())
+        aggregator.append(patch_prediction, patch_bbox)
 
 # Finalize aggregation
 prediction = aggregator.get_output()

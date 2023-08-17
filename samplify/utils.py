@@ -30,11 +30,11 @@ class LazyArray:
 def bbox_s_to_bbox_h(bbox_s, image_h, spatial_first):
     dims_n = len(image_h.shape) - len(bbox_s[:, 0])
     if spatial_first:
-        bbox_h = [index_pair.tolist() for index_pair in bbox_s]
+        bbox_h = [index_pair for index_pair in bbox_s]
         bbox_h.extend([[None]] * dims_n)
     else:
         bbox_h = [[None]] * dims_n
-        bbox_h.extend([index_pair.tolist() for index_pair in bbox_s])
+        bbox_h.extend([index_pair for index_pair in bbox_s])
     return bbox_h
 
 
@@ -57,11 +57,11 @@ def broadcast_to(data, target_shape, spatial_first):
         non_spatial_dims = len(target_shape) - len(data.shape)
         data_reshaped = data
         for _ in range(non_spatial_dims):
-            data_reshaped = data_reshaped[..., np.newaxis]
-        data_reshaped = np.broadcast_to(data_reshaped, target_shape)
+            data_reshaped = data_reshaped[..., None]
+        data_reshaped = data_reshaped.broadcast_to(target_shape)
     else:
-        data_reshaped = np.broadcast_to(data, target_shape)
-    data_reshaped = np.copy(data_reshaped)
+        data_reshaped = data.broadcast_to(target_shape)
+    data_reshaped = data_reshaped.copy()
     return data_reshaped
 
 

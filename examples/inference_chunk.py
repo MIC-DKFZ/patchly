@@ -25,7 +25,7 @@ def example():
     # Create an empty prediction passed to the aggregator
     prediction = np.zeros(spatial_size, dtype=np.uint8)
     # Init aggregator
-    aggregator = Aggregator(sampler=sampler, output=prediction, chunk_size=chunk_size, weights='gaussian', softmax_dim=1)
+    aggregator = Aggregator(sampler=sampler, output=prediction, chunk_size=chunk_size, weights='gaussian', softmax_dim=0, spatial_first=False, has_batch_dim=True)
 
     # Run inference
     with torch.no_grad():
@@ -33,8 +33,7 @@ def example():
             patch_prediction = model(patch)
             patch_prediction = patch_prediction.cpu().numpy()
             patch_bbox = patch_bbox.cpu().numpy()
-            for i in range(len(patch_prediction)):
-                aggregator.append(patch_prediction[i], patch_bbox[i])
+            aggregator.append(patch_prediction, patch_bbox)
 
     # Finalize aggregation
     prediction = aggregator.get_output()

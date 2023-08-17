@@ -34,7 +34,7 @@ class GridSampler:
         :param mode: TODO
         """
         self.image_h = image
-        self.spatial_size_s = np.asarray(spatial_size)
+        self.image_size_s = np.asarray(spatial_size)
         self.patch_size_s = np.asarray(patch_size)
         self.patch_offset_s = self.set_patch_offset(patch_offset, patch_size)
         self.spatial_first = spatial_first
@@ -54,50 +54,50 @@ class GridSampler:
     def check_sanity(self):
         if self.image_h is not None and not hasattr(self.image_h, '__getitem__'):
             raise RuntimeError("The given image is not ArrayLike.")
-        if self.spatial_first and self.image_h is not None and (self.image_h.shape[:len(self.spatial_size_s)] != tuple(self.spatial_size_s)):
-            raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image_h.shape[:len(self.spatial_size_s)], self.spatial_size_s))
-        if (not self.spatial_first) and self.image_h is not None and (self.image_h.shape[-len(self.spatial_size_s):] != tuple(self.spatial_size_s)):
-            raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image_h.shape[-len(self.spatial_size_s):], self.spatial_size_s))
-        if np.any(self.patch_size_s > self.spatial_size_s):
-            raise RuntimeError("The patch size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.patch_size_s, self.spatial_size_s))
+        if self.spatial_first and self.image_h is not None and (self.image_h.shape[:len(self.image_size_s)] != tuple(self.image_size_s)):
+            raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image_h.shape[:len(self.image_size_s)], self.image_size_s))
+        if (not self.spatial_first) and self.image_h is not None and (self.image_h.shape[-len(self.image_size_s):] != tuple(self.image_size_s)):
+            raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image_h.shape[-len(self.image_size_s):], self.image_size_s))
+        if np.any(self.patch_size_s > self.image_size_s):
+            raise RuntimeError("The patch size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.patch_size_s, self.image_size_s))
         if self.patch_offset_s is not None and np.any(self.patch_offset_s > self.patch_size_s):
             raise RuntimeError("The patch offset ({}) cannot be greater than the patch size ({}) in one or more dimensions.".format(self.patch_offset_s, self.patch_size_s))
-        if len(self.spatial_size_s) != len(self.patch_size_s):
+        if len(self.image_size_s) != len(self.patch_size_s):
             raise RuntimeError("The dimensionality of the patch size ({}) is required to be the same as the spatial size ({})."
-                               .format(self.patch_size_s, self.spatial_size_s))
-        if self.patch_offset_s is not None and len(self.spatial_size_s) != len(self.patch_offset_s):
+                               .format(self.patch_size_s, self.image_size_s))
+        if self.patch_offset_s is not None and len(self.image_size_s) != len(self.patch_offset_s):
             raise RuntimeError("The dimensionality of the patch offset ({}) is required to be the same as the spatial size ({})."
-                               .format(self.patch_offset_s, self.spatial_size_s))
+                               .format(self.patch_offset_s, self.image_size_s))
         if self.mode.name.startswith('PAD_') and (self.image_h is None or not isinstance(self.image_h, np.ndarray)):
             raise RuntimeError("The given sampling mode ({}) requires the image to be given and as type np.ndarray.".format(self.mode))
         
     def create_sampler(self):
         if self.mode == SamplingMode.SAMPLE_EDGE:
-            sampler = _EdgeGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _EdgeGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
         elif self.mode == SamplingMode.SAMPLE_ADAPTIVE:
-            sampler = _AdaptiveGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _AdaptiveGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
         elif self.mode == SamplingMode.SAMPLE_CROP:
-            sampler = _CropGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _CropGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
         elif self.mode.name.startswith('PAD_'):
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
             self.pad_image()
-            sampler = _CropGridSampler(image_h=self.image_h, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _CropGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
         else:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         return sampler
 
     def pad_image(self):
         if self.mode.startswith('pad_end_'):
-            pad_width_after = np.asarray(self.spatial_size_s) - np.asarray(self.image_h.shape)
+            pad_width_after = np.asarray(self.image_size_s) - np.asarray(self.image_h.shape)
             pad_width_after = np.clip(pad_width_after, a_min=0, a_max=None)
-            self.spatial_size_s += pad_width_after
+            self.image_size_s += pad_width_after
             pad_width_after = pad_width_after[..., np.newaxis]
             pad_width = np.hstack((np.zeros_like(pad_width_after), pad_width_after))
             pad_mode = self.mode[8:]
         elif self.mode.startswith('pad_edges_'):
-            pad_width_after = np.asarray(self.spatial_size_s) - np.asarray(self.image_h.shape)
+            pad_width_after = np.asarray(self.image_size_s) - np.asarray(self.image_h.shape)
             pad_width_after = np.clip(pad_width_after, a_min=0, a_max=None)
-            self.spatial_size_s += pad_width_after
+            self.image_size_s += pad_width_after
             pad_width_before = pad_width_after // 2
             pad_width_after = pad_width_after - pad_width_before
             pad_width_after = pad_width_after[..., np.newaxis]
@@ -129,7 +129,7 @@ class GridSampler:
 
 
 class _CropGridSampler:
-    def __init__(self, spatial_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
         TODO Redo doc
 
@@ -147,15 +147,15 @@ class _CropGridSampler:
         :param patch_offset: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
         """
         self.image_h = image_h
-        self.spatial_size_s = spatial_size_s
-        self.spatial_first = spatial_first
+        self.image_size_s = image_size_s
         self.patch_size_s = patch_size_s
         self.patch_offset_s = patch_offset_s
+        self.spatial_first = spatial_first
         self.patch_positions_s, self.patch_sizes_s = self.compute_patches()
 
     def compute_patches(self):
-        n_axis_s = len(self.spatial_size_s)
-        stop_s = [self.spatial_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
+        n_axis_s = len(self.image_size_s)
+        stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
         axis_positions_s = [np.arange(0, stop_s[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
         patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
         axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
@@ -202,7 +202,7 @@ class _CropGridSampler:
 
 
 class _EdgeGridSampler(_CropGridSampler):
-    def __init__(self, spatial_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
         TODO Redo doc
 
@@ -227,15 +227,15 @@ class _EdgeGridSampler(_CropGridSampler):
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         :param patch_offset: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
         """
-        super().__init__(spatial_size_s=spatial_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
+        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
-        n_axis_s = len(self.spatial_size_s)
-        stop_s = [self.spatial_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
+        n_axis_s = len(self.image_size_s)
+        stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
         axis_positions_s = [np.arange(0, stop_s[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
         for axis in range(n_axis_s):
-            if axis_positions_s[axis][-1] != self.spatial_size_s[axis] - self.patch_size_s[axis]:
-                axis_positions_s[axis] = np.append(axis_positions_s[axis], [self.spatial_size_s[axis] - self.patch_size_s[axis]],
+            if axis_positions_s[axis][-1] != self.image_size_s[axis] - self.patch_size_s[axis]:
+                axis_positions_s[axis] = np.append(axis_positions_s[axis], [self.image_size_s[axis] - self.patch_size_s[axis]],
                                                axis=0)
         patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
         axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
@@ -246,27 +246,27 @@ class _EdgeGridSampler(_CropGridSampler):
 
 
 class _AdaptiveGridSampler(_CropGridSampler):
-    def __init__(self, spatial_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, min_patch_size_s: np.ndarray = None):
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, min_patch_size_s: np.ndarray = None):
         # TODO: When used in ChunkedGridSampler the adaptive patches should have a minimum size of patch size
         # TODO: Do doc
         self.min_patch_size_s = min_patch_size_s
         if self.min_patch_size_s is not None and np.any(self.min_patch_size_s > patch_size_s):
             raise RuntimeError("The minimum patch size ({}) cannot be greater than the actual patch size ({}) in one or more dimensions.".format(self.min_patch_size_s, patch_size_s))
-        super().__init__(spatial_size_s=spatial_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
+        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
-        n_axis_s = len(self.spatial_size_s)
-        stop = [self.spatial_size_s[axis] for axis in range(n_axis_s)]
+        n_axis_s = len(self.image_size_s)
+        stop = [self.image_size_s[axis] for axis in range(n_axis_s)]
         axis_positions_s = [np.arange(0, stop[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
         patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
         for axis in range(n_axis_s):
             for index in range(len(axis_positions_s[axis])):
                 # If part of this patch is extending beyonf the image
-                if self.spatial_size_s[axis] < axis_positions_s[axis][index] + patch_sizes_s[axis][index]:
-                    patch_sizes_s[axis][index] = self.spatial_size_s[axis] - axis_positions_s[axis][index]
+                if self.image_size_s[axis] < axis_positions_s[axis][index] + patch_sizes_s[axis][index]:
+                    patch_sizes_s[axis][index] = self.image_size_s[axis] - axis_positions_s[axis][index]
                     # If there is a minimum patch size, give the patch at least minimum patch size
                     if self.min_patch_size_s is not None and patch_sizes_s[axis][index] < self.min_patch_size_s[axis]:
-                        axis_positions_s[axis][index] = self.spatial_size_s[axis] - self.min_patch_size_s[axis]
+                        axis_positions_s[axis][index] = self.image_size_s[axis] - self.min_patch_size_s[axis]
                         patch_sizes_s[axis][index] = self.min_patch_size_s[axis]                
         axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
         patch_sizes_s = np.meshgrid(*patch_sizes_s, indexing='ij')

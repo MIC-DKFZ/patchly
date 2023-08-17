@@ -21,15 +21,16 @@ class PatchStatus(Enum):
 
 class Aggregator:
     def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
-                 weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None, spatial_first: bool = True):
+                 weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None, has_batch_dim: Optional[str] = False, spatial_first: bool = True):
         self.sampler = sampler
-        self.spatial_size_s = sampler.spatial_size_s
+        self.image_size_s = sampler.image_size_s
         self.patch_size_s = sampler.patch_size_s
         self.patch_offset_s = sampler.patch_offset_s
         self.chunk_size_s = chunk_size
         self.spatial_first = spatial_first
         self.mode = sampler.mode
         self.softmax_dim = softmax_dim
+        self.has_batch_dim = has_batch_dim
         self.output_h = self.set_output(output, output_size)
         self.weight_patch_s, self.weight_map_s = self.set_weights(weights)
         self.check_sanity()
@@ -57,7 +58,7 @@ class Aggregator:
 
         if self.softmax_dim is None:
             if self.chunk_size_s is None:
-                weight_map_size_s = self.spatial_size_s
+                weight_map_size_s = self.image_size_s
             else:
                 weight_map_size_s = self.chunk_size_s
             if weights_s == 'avg':
@@ -83,26 +84,28 @@ class Aggregator:
     def check_sanity(self):
         if not hasattr(self.output_h, '__getitem__'):
             raise RuntimeError("The given output is not ArrayLike.")
-        if self.spatial_first and (self.output_h.shape[:len(self.spatial_size_s)] != tuple(self.spatial_size_s)):
-            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[:len(self.spatial_size_s)], self.spatial_size_s))
-        if (not self.spatial_first) and (self.output_h.shape[-len(self.spatial_size_s):] != tuple(self.spatial_size_s)):
-            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[-len(self.spatial_size_s):], self.spatial_size_s))
-        if self.chunk_size_s is not None and np.any(self.chunk_size_s > self.spatial_size_s):
-            raise RuntimeError("The chunk size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.chunk_size_s, self.spatial_size_s))
+        if self.spatial_first and (self.output_h.shape[:len(self.image_size_s)] != tuple(self.image_size_s)):
+            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[:len(self.image_size_s)], self.image_size_s))
+        if (not self.spatial_first) and (self.output_h.shape[-len(self.image_size_s):] != tuple(self.image_size_s)):
+            raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[-len(self.image_size_s):], self.image_size_s))
+        if self.chunk_size_s is not None and np.any(self.chunk_size_s > self.image_size_s):
+            raise RuntimeError("The chunk size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.chunk_size_s, self.image_size_s))
         if self.chunk_size_s is not None and np.any(self.patch_size_s >= self.chunk_size_s):
             raise RuntimeError("The patch size ({}) cannot be greater or equal to the chunk size ({}) in one or more dimensions.".format(self.patch_size_s, self.chunk_size_s))
-        if self.chunk_size_s is not None and len(self.spatial_size_s) != len(self.chunk_size_s):
-            raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({}).".format(self.chunk_size_s, self.spatial_size_s))
+        if self.chunk_size_s is not None and len(self.image_size_s) != len(self.chunk_size_s):
+            raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({}).".format(self.chunk_size_s, self.image_size_s))
+        if self.has_batch_dim and self.spatial_first:
+            raise RuntimeError("The arguments has_batch_dim and spatial_first cannot both be true at the same time.")
         if self.mode.name.startswith('PAD_') and self.chunk_size_s is not None:
             raise RuntimeError("The given sampling mode ({}) is not compatible with chunk sampling.".format(self.mode))
 
     def set_aggregator(self, sampler, output_h, softmax_dim):
         if self.mode.name.startswith('SAMPLE_') and self.chunk_size_s is None:
-            aggregator = _Aggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s,
-                                  output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s, weight_map_s=self.weight_map_s)
+            aggregator = _Aggregator(sampler=sampler, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s,
+                                  output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, has_batch_dim=self.has_batch_dim, weight_patch_s=self.weight_patch_s, weight_map_s=self.weight_map_s)
         elif self.mode.name.startswith('SAMPLE_') and self.chunk_size_s is not None:
-            aggregator = _ChunkAggregator(sampler=sampler, spatial_size_s=self.spatial_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, chunk_size_s=self.chunk_size_s,
-                                       output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, weight_patch_s=self.weight_patch_s)
+            aggregator = _ChunkAggregator(sampler=sampler, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, chunk_size_s=self.chunk_size_s,
+                                       output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, has_batch_dim=self.has_batch_dim, weight_patch_s=self.weight_patch_s)
         elif self.mode.name.startswith('PAD_') and self.chunk_size_s is None:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         elif self.mode.name.startswith('PAD_') and self.chunk_size_s is not None:
@@ -128,8 +131,8 @@ class Aggregator:
 
 
 class _Aggregator:
-    def __init__(self, sampler: GridSampler, spatial_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike],
-                 output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, softmax_dim: Optional[int] = None,
+    def __init__(self, sampler: GridSampler, image_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike],
+                 output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, softmax_dim: Optional[int] = None, has_batch_dim: Optional[str] = False,
                  weight_patch_s: npt.ArrayLike = None, weight_map_s: npt.ArrayLike = None):
         """
         Aggregator to assemble an image with continuous content from patches. The content of overlapping patches is averaged.
@@ -141,33 +144,47 @@ class _Aggregator:
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
         """
         self.sampler = sampler
-        self.spatial_size_s = np.asarray(spatial_size_s)
+        self.image_size_h = None
+        self.image_size_n = None
+        self.image_size_s = np.asarray(image_size_s)
         self.patch_size_s = np.asarray(patch_size_s)
         self.output_h = output_h
         self.spatial_first = spatial_first
         self.softmax_dim = softmax_dim
+        self.has_batch_dim = has_batch_dim
         self.weight_patch_s = weight_patch_s
         self.weight_patch_h = None
         self.weight_map_s = weight_map_s
         self.computed_inplace = False
 
-    def append(self, patch, patch_bbox):
+    def append(self, patch_h, patch_bbox_s):
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
         :param patch_bbox: The patch bbox in the format of (w_start, w_end, h_start, h_end, d_start, d_end, ...).
         """
-        patch_h = patch
-        patch_bbox_s = patch_bbox
 
+        # Check if out put was already computed inplace once.
         if self.computed_inplace:
             raise RuntimeError("get_output() has already been called with inplace=True. Therefore, no further patches can be appended.")
-        if self.weight_patch_h is None:
-            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.data_s_to_data_h(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
-        patch_bbox_h = utils.bbox_s_to_bbox_h(patch_bbox_s, self.output_h, self.spatial_first)
-        self.output_h[slicer(self.output_h, patch_bbox_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
-        if self.weight_map_s is not None:
-            self.weight_map_s[slicer(self.weight_map_s, patch_bbox_s)][...] += self.weight_patch_s
+        
+        # Determine holistic and non-spatial image shape
+        if self.image_size_h is None:
+            self.determine_image_sizes(patch_h)
+
+        # If the patch is a batch input then each patch in the batch must be processed individually
+        if self.has_batch_dim and len(patch_h.shape) == len(self.image_size_h) + 1:
+            for batch_idx in range(patch_h.shape[0]):
+                self.append(patch_h[batch_idx], patch_bbox_s[batch_idx])
+
+        # Add a patch
+        else:
+            if self.weight_patch_h is None:
+                self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.data_s_to_data_h(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
+            patch_bbox_h = utils.bbox_s_to_bbox_h(patch_bbox_s, self.output_h, self.spatial_first)
+            self.output_h[slicer(self.output_h, patch_bbox_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
+            if self.weight_map_s is not None:
+                self.weight_map_s[slicer(self.weight_map_s, patch_bbox_s)][...] += self.weight_patch_s
 
     def get_output(self, inplace: bool = False):
         """
@@ -191,12 +208,19 @@ class _Aggregator:
             if inplace:
                 self.computed_inplace = True
         return output_h
+    
+    def determine_image_sizes(self, patch_h):
+        self.image_size_h = patch_h.shape
+        if self.has_batch_dim:
+            self.image_size_h = self.image_size_h[1:]
+        self.image_size_h = np.concatenate((self.image_size_s, self.image_size_h[len(self.image_size_s):])) if self.spatial_first else np.concatenate((self.image_size_h[:-len(self.image_size_s)], self.image_size_s))
+        self.image_size_n = self.image_size_h[len(self.image_size_s):] if self.spatial_first else self.image_size_h[:-len(self.image_size_s)]
 
 
 class _ChunkAggregator(_Aggregator):
-    def __init__(self, sampler: GridSampler, spatial_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_offset_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
+    def __init__(self, sampler: GridSampler, image_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_offset_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
                  output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True,
-                 softmax_dim: Optional[int] = None, weight_patch_s: npt.ArrayLike = None):
+                 softmax_dim: Optional[int] = None, has_batch_dim: Optional[str] = False, weight_patch_s: npt.ArrayLike = None):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.
@@ -207,7 +231,7 @@ class _ChunkAggregator(_Aggregator):
         :param weights: A weight map of size patch_size that should be used for weighting the importance of each value in a patch. Default is a gaussian weight map.
         :param low_memory_mode: Reduces memory consumption by more than 50% in comparison to the normal WeightedAggregator and Aggregator. However, the prediction quality is slightly reduced.
         """
-        super().__init__(sampler=sampler, spatial_size_s=spatial_size_s, patch_size_s=patch_size_s, output_h=output_h, spatial_first=spatial_first, softmax_dim=softmax_dim, weight_patch_s=weight_patch_s, weight_map_s=None)
+        super().__init__(sampler=sampler, image_size_s=image_size_s, patch_size_s=patch_size_s, output_h=output_h, spatial_first=spatial_first, softmax_dim=softmax_dim, has_batch_dim=has_batch_dim, weight_patch_s=weight_patch_s, weight_map_s=None)
         self.patch_offset_s = patch_offset_s
         self.chunk_size_s = chunk_size_s
         self.chunk_dtype = self.set_chunk_dtype()
@@ -222,7 +246,7 @@ class _ChunkAggregator(_Aggregator):
 
     def compute_patches(self):
         patch_sampler = self.sampler
-        chunk_sampler = _AdaptiveGridSampler(spatial_size_s=self.spatial_size_s, patch_size_s=self.chunk_size_s, patch_offset_s=self.chunk_size_s)
+        chunk_sampler = _AdaptiveGridSampler(image_size_s=self.image_size_s, patch_size_s=self.chunk_size_s, patch_offset_s=self.chunk_size_s)
         chunk_patch_dict = defaultdict(dict)
         patch_chunk_dict = defaultdict(dict)
         
@@ -243,28 +267,37 @@ class _ChunkAggregator(_Aggregator):
 
         return chunk_sampler, chunk_patch_dict, patch_chunk_dict
 
-    def append(self, patch, patch_bbox):
+    def append(self, patch_h, patch_bbox_s):
         """
         Appends a patch to the output.
         :param patch: The patch data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions.
         :param patch_bbox: The patch bbox in the format of (w_start, w_end, h_start, h_end, d_start, d_end, ...).
         """
-        patch_h = patch
-        patch_bbox_s = patch_bbox
 
-        if self.weight_patch_h is None:
-            self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.data_s_to_data_h(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
+        # Determine holistic and non-spatial image shape
+        if self.image_size_h is None:
+            self.determine_image_sizes(patch_h)
 
-        self.patch_chunk_dict[str(patch_bbox_s)]["patch"].create(patch_h)
+        # If the patch is a batch input then each patch in the batch must be processed individually
+        if self.has_batch_dim and len(patch_h.shape) == len(self.image_size_h) + 1:
+            for batch_idx in range(patch_h.shape[0]):
+                self.append(patch_h[batch_idx], patch_bbox_s[batch_idx])
 
-        for chunk_id in self.patch_chunk_dict[str(patch_bbox_s)]["chunks"]:
-            self.chunk_patch_dict[chunk_id][str(patch_bbox_s)]["status"] = PatchStatus.FILLED
-            if self.is_chunk_complete(chunk_id):
-                if isinstance(self.output_h, zarr.core.Array):
-                    warnings.warn("Ouput is a Zarr array. Switching to single threading for chunk processing. See issue #39 for more information.") # If issue is solved remove zarr and warnings import statements
-                    self.process_chunk(chunk_id)
-                else:
-                    self.executor.submit(self.process_chunk, chunk_id)
+        # Add a patch
+        else:
+            if self.weight_patch_h is None:
+                self.weight_patch_h = utils.broadcast_to(self.weight_patch_s, utils.data_s_to_data_h(self.weight_patch_s.shape, patch_h.shape, self.spatial_first), self.spatial_first)
+
+            self.patch_chunk_dict[str(patch_bbox_s)]["patch"].create(patch_h)
+
+            for chunk_id in self.patch_chunk_dict[str(patch_bbox_s)]["chunks"]:
+                self.chunk_patch_dict[chunk_id][str(patch_bbox_s)]["status"] = PatchStatus.FILLED
+                if self.is_chunk_complete(chunk_id):
+                    if isinstance(self.output_h, zarr.core.Array):
+                        warnings.warn("Ouput is a Zarr array. Switching to single threading for chunk processing. See issue #39 for more information.") # If issue is solved remove zarr and warnings import statements
+                        self.process_chunk(chunk_id)
+                    else:
+                        self.executor.submit(self.process_chunk, chunk_id)
 
     def is_chunk_complete(self, chunk_id):
         for patch_data in self.chunk_patch_dict[chunk_id].values():

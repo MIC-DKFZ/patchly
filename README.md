@@ -81,14 +81,13 @@ sampler = GridSampler(image=np.random.random((1000, 1000, 3)), spatial_size=(100
 # Init dataloader
 loader = DataLoader(ExampleDataset(sampler), batch_size=4, num_workers=0, shuffle=False)
 # Init aggregator
-aggregator = Aggregator(sampler=sampler, output_size=(8, 1000, 1000), spatial_first=False)
+aggregator = Aggregator(sampler=sampler, output_size=(8, 1000, 1000), spatial_first=False, has_batch_dim=True)
 
 # Run inference
 with torch.no_grad():
     for patch, patch_bbox in loader:
         patch_prediction = model(patch)
-        for i in range(len(patch_prediction)):
-            aggregator.append(patch_prediction[i].cpu().numpy(), patch_bbox[i].cpu().numpy())
+        aggregator.append(patch_prediction.cpu().numpy(), patch_bbox.cpu().numpy())
 
 # Finalize aggregation
 prediction = aggregator.get_output()

@@ -43,7 +43,7 @@ class Aggregator:
         if output is not None:
             array_type = type(output)
         else:
-            array_type = np.ndarray
+            array_type = None
         return array_type
 
     def set_output(self, output_h, output_size_h):
@@ -181,8 +181,7 @@ class _Aggregator:
         """
 
         if not isinstance(patch_h, ArrayLike):
-            self.array_type = type(patch_h)
-            patch_h = create_array_like(self.array_type, patch_h, self.device)
+            patch_h = create_array_like(type(patch_h), patch_h, self.device)
 
         # Check if out put was already computed inplace once.
         if self.computed_inplace:
@@ -247,16 +246,20 @@ class _Aggregator:
         self.image_size_n = self.image_size_h[len(self.image_size_s):] if self.spatial_first else self.image_size_h[:-len(self.image_size_s)]
 
     def verify_array_types(self, array_type):
-        if self.weight_patch_s is not None and array_type != self.weight_patch_s:
-            self.weight_patch_s = create_array_like(array_type, self.weight_patch_s.data, self.device)
-            # Only change output_h if weight_patch_s has also the wrong array type as that means that only an output_size_h was given during intialization
+        if self.array_type is None:
+            # Only change output_h if only an output_size_h was given during intialization
             self.output_h = create_array_like(array_type, self.output_h.data, self.device)
 
+        if self.weight_patch_s is not None and array_type != self.weight_patch_s:
+            self.weight_patch_s = create_array_like(array_type, self.weight_patch_s.data, self.device)            
+            
         if self.weight_patch_h is not None and array_type!= self.weight_patch_h:
             self.weight_patch_h = create_array_like(array_type, self.weight_patch_h.data, self.device)
 
         if self.weight_map_s is not None and array_type != self.weight_map_s:
             self.weight_map_s = create_array_like(array_type, self.weight_map_s.data, self.device)
+
+        self.array_type = array_type
 
 
 class _ChunkAggregator(_Aggregator):
@@ -318,8 +321,7 @@ class _ChunkAggregator(_Aggregator):
         """
 
         if not isinstance(patch_h, ArrayLike):
-            self.array_type = type(patch_h)
-            patch_h = create_array_like(self.array_type, patch_h, self.device)
+            patch_h = create_array_like(type(patch_h), patch_h, self.device)
 
         # Determine holistic and non-spatial image shape
         if self.image_size_h is None:

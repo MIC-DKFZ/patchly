@@ -5,7 +5,7 @@ import zarr
 
 
 def create_array_like(array_type, data, device=None):
-    if array_type == np.ndarray:
+    if array_type == np.ndarray or array_type is None:
         return NumpyArray(data, device)
     elif array_type == zarr.core.Array:
         return NumpyArray(data, device)

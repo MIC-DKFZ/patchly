@@ -2,6 +2,7 @@ import numpy as np
 from samplify.sampler import GridSampler, _AdaptiveGridSampler
 from samplify.slicer import slicer
 from samplify import utils
+from samplify.sampler import SamplingMode
 from samplify.array_like import create_array_like, ArrayLike
 from collections import defaultdict
 import concurrent.futures
@@ -62,6 +63,9 @@ class Aggregator:
     def set_weights(self, weights_s):
         if weights_s == 'avg':
             weight_patch_s = create_array_like(self.array_type, None, self.device).create_ones(self.patch_size_s, "uint8")
+        elif self.mode == SamplingMode.SAMPLE_ADAPTIVE and weights_s == 'gaussian':
+            # The gaussian kernel would be shifted if the weight_patch is cropped due to adaptive mode
+            raise RuntimeError("Adaptive sampling cannot be used with gaussian weighting. Use a different sampler mode.")
         elif weights_s == 'gaussian':
             weight_patch_s = create_array_like(self.array_type, None, self.device).create_gaussian_kernel(self.patch_size_s, dtype="float32")
         elif hasattr(self.output_h, '__getitem__'):
@@ -198,15 +202,18 @@ class _Aggregator:
             # Verify and correct the array types of specific ArrayLikes as their true array type can only be determined based on an actual patch
             self.verify_array_types(type(patch_h.data))
 
-            # Create holistic bbox based on spatial bbox
+            # Create holistic bboxes based on spatial bbox
             patch_bbox_h = utils.bbox_s_to_bbox_h(patch_bbox_s, self.output_h, self.spatial_first)
-
+            weight_patch_bbox_s = np.asarray([[0, patch_bbox_s[axis][1] - patch_bbox_s[axis][0]]  for axis in range(len(self.image_size_s))])
+            weight_patch_bbox_h = utils.bbox_s_to_bbox_h(weight_patch_bbox_s, self.output_h, self.spatial_first)
+            
             # Add patch to output with weight patch
-            self.output_h[slicer(self.output_h, patch_bbox_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
+            # self.output_h[slicer(self.output_h, patch_bbox_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h.astype(self.output_h.dtype)
+            self.output_h[slicer(self.output_h, patch_bbox_h)] += patch_h.astype(self.output_h.dtype) * self.weight_patch_h[slicer(self.weight_patch_h, weight_patch_bbox_h)].astype(self.output_h.dtype)
 
             # Add weight patch to weight map
             if self.weight_map_s is not None:
-                self.weight_map_s[slicer(self.weight_map_s, patch_bbox_s)] += self.weight_patch_s
+                self.weight_map_s[slicer(self.weight_map_s, patch_bbox_s)] += self.weight_patch_s[slicer(self.weight_patch_s, weight_patch_bbox_s)]
 
     def get_output(self, inplace: bool = False):
         """

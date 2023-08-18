@@ -16,7 +16,7 @@ class SamplingMode(Enum):
 
 class GridSampler:
     def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_offset: Optional[Union[Tuple, npt.ArrayLike]] = None,
-                 image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_EDGE, pad_kwargs: dict = None):
+                 image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_SQUEEZE, pad_kwargs: dict = None):
         """
         TODO description
         If no image is given then only patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.

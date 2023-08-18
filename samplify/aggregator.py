@@ -8,8 +8,12 @@ import concurrent.futures
 from typing import Union, Optional, Tuple, Callable
 import numpy.typing as npt
 from enum import Enum
-import zarr
 import warnings
+
+try:
+    import zarr
+except:
+    zarr = None
 
 
 class PatchStatus(Enum):
@@ -337,12 +341,12 @@ class _ChunkAggregator(_Aggregator):
             for chunk_id in self.patch_chunk_dict[str(np.asarray(patch_bbox_s))]["chunks"]:
                 self.chunk_patch_dict[chunk_id][str(np.asarray(patch_bbox_s))]["status"] = PatchStatus.FILLED
                 if self.is_chunk_complete(chunk_id):
-                    if isinstance(self.output_h.data, zarr.core.Array):
+                    if zarr is not None and isinstance(self.output_h.data, zarr.core.Array):
                         warnings.warn("Ouput is a Zarr array. Switching to single threading for chunk processing. See issue #39 for more information.") # If issue is solved remove zarr and warnings import statements
                         self.process_chunk(chunk_id)
                     else:
-                        # self.executor.submit(self.process_chunk, chunk_id)
-                        self.process_chunk(chunk_id)
+                        self.executor.submit(self.process_chunk, chunk_id)
+                        # self.process_chunk(chunk_id)
 
     def is_chunk_complete(self, chunk_id):
         for patch_data in self.chunk_patch_dict[chunk_id].values():

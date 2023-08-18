@@ -1,6 +1,10 @@
 import numpy as np
 import string
-import torch
+
+try:
+    import torch
+except:
+    torch = None
 
 
 class LazyArray:

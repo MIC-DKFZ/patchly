@@ -1,16 +1,24 @@
 import numpy as np
 from abc import ABC, abstractmethod
 from samplify.utils import gaussian_kernel_numpy, gaussian_kernel_pytorch
-import torch
-import zarr
+
+try:
+    import torch
+except:
+    torch = None
+
+try:
+    import zarr
+except:
+    zarr = None
 
 
 def create_array_like(array_type, data, device=None):
     if array_type == np.ndarray or array_type is None:
         return NumpyArray(data, device)
-    elif array_type == zarr.core.Array:
+    elif zarr is not None and array_type == zarr.core.Array:
         return NumpyArray(data, device)
-    elif array_type == torch.Tensor:
+    elif torch is not None and array_type == torch.Tensor:
         if data is not None:
             data = torch.tensor(data)
         return TensorArray(data, device)

@@ -3,6 +3,7 @@ import numpy as np
 import zarr
 from samplify import GridSampler, Aggregator, SamplingMode, utils
 import copy
+import torch
 
 
 class TestEdgeAggregator(unittest.TestCase):
@@ -150,6 +151,16 @@ class TestEdgeAggregator(unittest.TestCase):
 
         self._test_aggregator(image, spatial_size, patch_size, output=output)
 
+    def test_tensor(self):
+        patch_size = (10, 10)
+        spatial_size = (100, 100)
+        image = np.random.random(spatial_size)
+        image = torch.tensor(image)
+        output = np.zeros_like(image)
+        output = torch.tensor(output)
+
+        self._test_aggregator(image, spatial_size, patch_size, output=output)
+
     def test_gaussian_weights(self):
         patch_size = (10, 10)
         patch_offset = (5, 10)
@@ -200,9 +211,15 @@ class TestEdgeAggregator(unittest.TestCase):
 
         if not multiply_patch_by_index:
             if softmax_dim is None:
-                np.testing.assert_almost_equal(image, output1, decimal=6)
+                if not isinstance(output1, torch.Tensor):
+                    np.testing.assert_almost_equal(image, output1, decimal=6)
+                else:
+                    torch.testing.assert_close(image.to(dtype=torch.float32), output1.to(dtype=torch.float32))
             else:
-                np.testing.assert_almost_equal(image.argmax(axis=softmax_dim).astype(np.uint16), output1, decimal=6)
+                if not isinstance(output1, torch.Tensor):
+                    np.testing.assert_almost_equal(image.argmax(axis=softmax_dim).astype(np.uint16), output1, decimal=6)
+                else:
+                    torch.testing.assert_close(image.argmax(axis=softmax_dim).to(dtype=torch.int32), output1.to(dtype=torch.int32))
 
         # Test without output array
         if output is None:
@@ -221,9 +238,15 @@ class TestEdgeAggregator(unittest.TestCase):
 
         if not multiply_patch_by_index:
             if softmax_dim is None:
-                np.testing.assert_almost_equal(image, output2, decimal=6)
+                if not isinstance(output2, torch.Tensor):
+                    np.testing.assert_almost_equal(image, output2, decimal=6)
+                else:
+                    torch.testing.assert_close(image.to(dtype=torch.float32), output2.to(dtype=torch.float32))
             else:
-                np.testing.assert_almost_equal(image.argmax(axis=softmax_dim).astype(np.uint16), output2, decimal=6)
+                if not isinstance(output2, torch.Tensor):
+                    np.testing.assert_almost_equal(image.argmax(axis=softmax_dim).astype(np.uint16), output2, decimal=6)
+                else:
+                    torch.testing.assert_close(image.argmax(axis=softmax_dim).to(dtype=torch.int32), output2.to(dtype=torch.int32))
 
         return output1, output2
 

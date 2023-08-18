@@ -341,7 +341,8 @@ class _ChunkAggregator(_Aggregator):
                         warnings.warn("Ouput is a Zarr array. Switching to single threading for chunk processing. See issue #39 for more information.") # If issue is solved remove zarr and warnings import statements
                         self.process_chunk(chunk_id)
                     else:
-                        self.executor.submit(self.process_chunk, chunk_id)
+                        # self.executor.submit(self.process_chunk, chunk_id)
+                        self.process_chunk(chunk_id)
 
     def is_chunk_complete(self, chunk_id):
         for patch_data in self.chunk_patch_dict[chunk_id].values():

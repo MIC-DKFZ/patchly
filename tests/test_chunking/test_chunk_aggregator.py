@@ -3,6 +3,7 @@ import numpy as np
 import zarr
 from samplify import GridSampler, Aggregator, SamplingMode, utils
 import copy
+import torch
 
 
 class TestChunkAggregator(unittest.TestCase):
@@ -156,6 +157,17 @@ class TestChunkAggregator(unittest.TestCase):
         image = zarr.array(image)
         output = np.zeros_like(image)
         output = zarr.array(output)
+
+        self._test_aggregator(image, spatial_size, patch_size, chunk_size, output=output)
+
+    def test_tensor(self):
+        patch_size = (10, 10)
+        chunk_size = (50, 50)
+        spatial_size = (100, 100)
+        image = np.random.random(spatial_size)
+        image = torch.tensor(image)
+        output = np.zeros_like(image)
+        output = torch.tensor(output)
 
         self._test_aggregator(image, spatial_size, patch_size, chunk_size, output=output)
 

@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import zarr
 from samplify import GridSampler, slicer, utils, SamplingMode
+import torch
 
 
 class TestBasicGridSampler(unittest.TestCase):
@@ -158,6 +159,15 @@ class TestBasicGridSampler(unittest.TestCase):
         result_size = spatial_size
         image = np.random.random(spatial_size)
         image = zarr.array(image)
+
+        self._test_sampler(image, result_size, spatial_size, patch_size)
+
+    def test_tensor(self):
+        patch_size = (10, 10)
+        spatial_size = (100, 100)
+        result_size = spatial_size
+        image = np.random.random(spatial_size)
+        image = torch.tensor(image)
 
         self._test_sampler(image, result_size, spatial_size, patch_size)
 

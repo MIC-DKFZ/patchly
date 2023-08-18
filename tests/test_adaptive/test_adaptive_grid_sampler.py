@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import zarr
 from samplify import GridSampler, slicer, utils, SamplingMode
+import torch
 
 
 class TestAdaptiveGridSampler(unittest.TestCase):
@@ -140,6 +141,14 @@ class TestAdaptiveGridSampler(unittest.TestCase):
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
         image = zarr.array(image)
+
+        self._test_sampler(image, spatial_size, patch_size)
+
+    def test_tensor(self):
+        patch_size = (10, 10)
+        spatial_size = (100, 100)
+        image = np.random.random(spatial_size)
+        image = torch.tensor(image)
 
         self._test_sampler(image, spatial_size, patch_size)
 

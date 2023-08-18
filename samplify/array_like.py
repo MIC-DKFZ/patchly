@@ -173,7 +173,8 @@ class TensorArray(ArrayLike):
         }
 
     def create_zeros(self, shape, dtype=None):
-        if isinstance(dtype, str):
+        if isinstance(dtype, str) or isinstance(dtype, np.dtype):
+            dtype = str(dtype)
             dtype = self.dtype_map[dtype]
         self.data = torch.zeros(tuple(shape), dtype=dtype, device=self.device)
         return self

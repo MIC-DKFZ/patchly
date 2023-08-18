@@ -6,7 +6,7 @@ import copy
 import torch
 
 
-class TestChunkAggregator(unittest.TestCase):
+class TestEdgeChunkAggregator(unittest.TestCase):
     def test_without_offset_without_remainder_2d(self):
         patch_size = (10, 10)
         spatial_size = (100, 100)

@@ -10,7 +10,8 @@ class SamplingMode(Enum):
     SAMPLE_EDGE = 1
     SAMPLE_ADAPTIVE = 2
     SAMPLE_CROP = 3
-    PAD_UNKNOWN = 4
+    SAMPLE_SQUEEZE = 4
+    PAD_UNKNOWN = 5
 
 
 class GridSampler:
@@ -78,6 +79,8 @@ class GridSampler:
             sampler = _AdaptiveGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
         elif self.mode == SamplingMode.SAMPLE_CROP:
             sampler = _CropGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+        elif self.mode == SamplingMode.SAMPLE_SQUEEZE:
+            sampler = _SqueezeGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
         elif self.mode.name.startswith('PAD_'):
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
             self.pad_image()
@@ -273,3 +276,28 @@ class _AdaptiveGridSampler(_CropGridSampler):
         positions_s = np.column_stack([axis_positions_s[axis].ravel() for axis in range(n_axis_s)])
         patch_sizes_s = np.column_stack([patch_sizes_s[axis].ravel() for axis in range(n_axis_s)])
         return positions_s, patch_sizes_s
+
+
+class _SqueezeGridSampler(_CropGridSampler):
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
+
+    def compute_patches(self):
+        n_axis_s = len(self.image_size_s)
+        stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
+        axis_positions_s = [np.arange(0, stop_s[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
+        for axis in range(n_axis_s):
+            if axis_positions_s[axis][-1] + self.patch_size_s[axis] < self.image_size_s[axis]:
+                axis_positions_s[axis] = np.concatenate((axis_positions_s[axis], [axis_positions_s[axis][-1] + self.patch_offset_s[axis]]))
+        axis_squeeze_s = [(axis_positions_s[axis][-1] + self.patch_size_s[axis]) - self.image_size_s[axis] for axis in range(n_axis_s)]  ###
+        additional_offset_s = [axis_squeeze_s[axis] // (len(axis_positions_s[axis]) - 1) for axis in range(n_axis_s)]
+        remainder_offset_s = [axis_squeeze_s[axis] % (len(axis_positions_s[axis]) - 1) for axis in range(n_axis_s)]
+        axis_positions_s = [axis_positions_s[axis] - np.arange(0, len(axis_positions_s[axis])) * additional_offset_s[axis] for axis in range(n_axis_s)]
+        for axis in range(n_axis_s):
+            axis_positions_s[axis][-1] -= remainder_offset_s[axis]
+        patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
+        patch_sizes_s = np.meshgrid(*patch_sizes_s, indexing='ij')
+        patch_positions_s = np.column_stack([axis_positions_s[axis].ravel() for axis in range(n_axis_s)])
+        patch_sizes_s = np.column_stack([patch_sizes_s[axis].ravel() for axis in range(n_axis_s)])
+        return patch_positions_s, patch_sizes_s

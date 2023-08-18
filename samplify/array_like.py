@@ -1,5 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
+from samplify.utils import gaussian_kernel_numpy, gaussian_kernel_pytorch
 import torch
 import zarr
 
@@ -68,6 +69,10 @@ class ArrayLike(ABC):
     @abstractmethod
     def create_ones(self, shape, dtype=None):
         pass
+
+    @abstractmethod
+    def create_gaussian_kernel(self, shape, sigma=1./8, dtype=None):
+        pass
     
     @abstractmethod
     def min(self, axis=None):
@@ -116,6 +121,10 @@ class NumpyArray(ArrayLike):
 
     def create_ones(self, shape, dtype=None):
         self.data = np.ones(shape, dtype)
+        return self
+    
+    def create_gaussian_kernel(self, shape, sigma=1./8, dtype=None):
+        self.data = gaussian_kernel_numpy(shape, sigma, dtype)
         return self
     
     def min(self, axis=None):
@@ -171,6 +180,10 @@ class TensorArray(ArrayLike):
         if isinstance(dtype, str):
             dtype = self.dtype_map[dtype]
         self.data = torch.ones(shape, dtype=dtype, device=self.device)
+        return self
+    
+    def create_gaussian_kernel(self, shape, sigma=1./8, dtype=None):
+        self.data = gaussian_kernel_pytorch(shape, sigma, self.device, dtype)
         return self
     
     def min(self, axis=None):

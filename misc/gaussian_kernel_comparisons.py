@@ -6,17 +6,21 @@ import string
 import torch
 
 
-def gaussian_kernel_scipy(size_s, sigma=1./8):
-    sigma = size_s * sigma
-    center_coords = size_s // 2
-    tmp = np.zeros(size_s)
-    tmp[tuple(center_coords)] = 1
-    gaussian_weights_s = gaussian_filter(tmp, sigma, 0, mode='constant', cval=0)
-    gaussian_weights_s[gaussian_weights_s == 0] = np.min(gaussian_weights_s[gaussian_weights_s != 0])
-    return gaussian_weights_s
+def gaussian_kernel_scipy(size, sigma=1./8, dtype=None):
+    sigma = size * sigma
+    center_coords = size // 2
+    kernel_nd = np.zeros(size)
+    kernel_nd[tuple(center_coords)] = 1
+    kernel_nd = gaussian_filter(kernel_nd, sigma, 0, mode='constant', cval=0)
+    kernel_nd[kernel_nd == 0] = np.min(kernel_nd[kernel_nd != 0])
+
+    if dtype is not None:
+        kernel_nd = kernel_nd.astype(dtype)
+
+    return kernel_nd
 
 
-def gaussian_kernel_numpy(size, sigma=1./8):
+def gaussian_kernel_numpy(size, sigma=1./8, dtype=None):
     """Return an N-D Gaussian kernel array."""
     sigma = size * sigma
     
@@ -41,10 +45,13 @@ def gaussian_kernel_numpy(size, sigma=1./8):
 
     kernel_nd[kernel_nd == 0] = np.min(kernel_nd[kernel_nd != 0])
 
+    if dtype is not None:
+        kernel_nd = kernel_nd.astype(dtype)
+
     return kernel_nd
 
 
-def gaussian_kernel_pytorch(size, sigma=1./8, device='cpu'):
+def gaussian_kernel_pytorch(size, sigma=1./8, device='cpu', dtype=None):
     """Return an N-D Gaussian kernel array."""
     sigma = size * sigma
     
@@ -69,6 +76,9 @@ def gaussian_kernel_pytorch(size, sigma=1./8, device='cpu'):
 
     kernel_nd[kernel_nd == 0] = torch.min(kernel_nd[kernel_nd != 0])
 
+    if dtype is not None:
+        kernel_nd = kernel_nd.to(dtype=dtype)
+
     return kernel_nd
 
 
@@ -81,13 +91,13 @@ if __name__ == '__main__':
     print(size)
 
     start_time = time.time()
-    weights_scipy = gaussian_kernel_scipy(size)
+    weights_scipy = gaussian_kernel_scipy(size, dtype=np.float32)
     print("Runtime Scipy: {}s".format(time.time() - start_time))
     start_time = time.time()
-    weights_numpy = gaussian_kernel_numpy(size)
+    weights_numpy = gaussian_kernel_numpy(size, dtype=np.float32)
     print("Runtime Numpy: {}s".format(time.time() - start_time))
     start_time = time.time()
-    weights_pytorch = gaussian_kernel_pytorch(size)
+    weights_pytorch = gaussian_kernel_pytorch(size, dtype=torch.float32)
     print("Runtime Pytorch: {}s".format(time.time() - start_time))
     weights_pytorch = np.asarray(weights_pytorch.cpu())
 

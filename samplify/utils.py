@@ -1,4 +1,6 @@
 import numpy as np
+import string
+import torch
 
 
 class LazyArray:
@@ -82,3 +84,65 @@ def is_overlapping(bbox1, bbox2):
         if start1 >= end2 or start2 >= end1:
             return False
     return True
+
+
+def gaussian_kernel_numpy(size, sigma=1./8, dtype=None):
+    """Return an N-D Gaussian kernel array."""
+    sigma = size * sigma
+    
+    def gaussian_kernel_1d(size, sigma):
+        """Return a 1D Gaussian kernel array."""
+        offset = 1
+        if size % 2 == 0:  # Fix for even sizes to keep kernel centered
+            offset = 0
+        axis = np.linspace(-size // 2 + offset, size // 2, size)
+        kernel = np.exp(-axis**2 / (2 * sigma**2))
+        return kernel / kernel.sum()
+    
+    kernels = [gaussian_kernel_1d(size_axis, sigma_axis) for size_axis, sigma_axis in zip(size, sigma)]
+
+    chars = string.ascii_lowercase
+    subscripts = ""
+    for char in chars[:len(kernels)]:
+        subscripts += char + ','
+    subscripts = subscripts[:-1]
+
+    kernel_nd = np.einsum(subscripts, *kernels)
+
+    kernel_nd[kernel_nd == 0] = np.min(kernel_nd[kernel_nd != 0])
+
+    if dtype is not None:
+        kernel_nd = kernel_nd.astype(dtype)
+
+    return kernel_nd
+
+
+def gaussian_kernel_pytorch(size, sigma=1./8, device='cpu', dtype=None):
+    """Return an N-D Gaussian kernel array."""
+    sigma = size * sigma
+    
+    def gaussian_kernel_1d(size, sigma):
+        """Return a 1D Gaussian kernel array."""
+        offset = 1
+        if size % 2 == 0:  # Fix for even sizes to keep kernel centered
+            offset = 0
+        axis = torch.linspace(-size // 2 + offset, size // 2, size, device=device)
+        kernel = torch.exp(-axis**2 / (2 * sigma**2))
+        return kernel / kernel.sum()
+    
+    kernels = [gaussian_kernel_1d(size_axis, sigma_axis) for size_axis, sigma_axis in zip(size, sigma)]
+
+    chars = string.ascii_lowercase
+    subscripts = ""
+    for char in chars[:len(kernels)]:
+        subscripts += char + ','
+    subscripts = subscripts[:-1]
+
+    kernel_nd = torch.einsum(subscripts, *kernels)
+
+    kernel_nd[kernel_nd == 0] = torch.min(kernel_nd[kernel_nd != 0])
+
+    if dtype is not None:
+        kernel_nd = kernel_nd.to(dtype=dtype)
+
+    return kernel_nd

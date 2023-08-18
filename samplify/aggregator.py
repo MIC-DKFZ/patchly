@@ -3,9 +3,7 @@ from samplify.sampler import GridSampler, _AdaptiveGridSampler
 from samplify.slicer import slicer
 from samplify import utils
 from samplify.array_like import create_array_like, ArrayLike
-from scipy.ndimage.filters import gaussian_filter
 from collections import defaultdict
-import copy
 import concurrent.futures
 from typing import Union, Optional, Tuple, Callable
 import numpy.typing as npt
@@ -61,8 +59,9 @@ class Aggregator:
         if weights_s == 'avg':
             weight_patch_s = create_array_like(self.array_type, None, self.device).create_ones(self.patch_size_s, "uint8")
         elif weights_s == 'gaussian':
-            weight_patch_s = self.create_gaussian_weights(self.patch_size_s)
-            weight_patch_s = create_array_like(self.array_type, weight_patch_s, self.device)
+            weight_patch_s = create_array_like(self.array_type, None, self.device).create_gaussian_kernel(self.patch_size_s, dtype="float32")
+        elif hasattr(self.output_h, '__getitem__'):
+            weight_patch_s = weights_s
         elif callable(weights_s):
             weight_patch_s = weights_s
         else:
@@ -82,16 +81,6 @@ class Aggregator:
         else:
             weight_map_s = None
         return weight_patch_s, weight_map_s
-    
-    def create_gaussian_weights(self, size_s):
-        sigma_scale = 1. / 8
-        sigmas = size_s * sigma_scale
-        center_coords = size_s // 2
-        tmp = np.zeros(size_s)
-        tmp[tuple(center_coords)] = 1
-        gaussian_weights_s = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
-        gaussian_weights_s[gaussian_weights_s == 0] = np.min(gaussian_weights_s[gaussian_weights_s != 0])
-        return gaussian_weights_s
 
     def check_sanity(self):
         if not hasattr(self.output_h, '__getitem__'):

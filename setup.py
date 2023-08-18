@@ -10,7 +10,6 @@ setup(name='samplify',
       install_requires=[
             "numpy>=1.20",
             "scikit-image",
-            "scipy",
             "tqdm",
             'zarr'
       ],

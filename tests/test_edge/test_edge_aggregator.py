@@ -1,8 +1,7 @@
 import unittest
 import numpy as np
 import zarr
-from samplify import GridSampler, Aggregator, slicer, SamplingMode
-from scipy.ndimage.filters import gaussian_filter
+from samplify import GridSampler, Aggregator, SamplingMode, utils
 import copy
 
 
@@ -158,7 +157,7 @@ class TestEdgeAggregator(unittest.TestCase):
         image = np.random.random(spatial_size)
 
         expected_output = np.zeros_like(image)
-        weights = self.create_gaussian_weights(np.asarray(patch_size))
+        weights = utils.gaussian_kernel_numpy(np.asarray(patch_size), dtype=np.float64)
         weight_map = np.zeros_like(image)
 
         expected_output[:10, :] += image[:10, :] * weights * 0
@@ -227,16 +226,6 @@ class TestEdgeAggregator(unittest.TestCase):
                 np.testing.assert_almost_equal(image.argmax(axis=softmax_dim).astype(np.uint16), output2, decimal=6)
 
         return output1, output2
-
-    def create_gaussian_weights(self, size):
-        sigma_scale = 1. / 8
-        sigmas = size * sigma_scale
-        center_coords = size // 2
-        tmp = np.zeros(size)
-        tmp[tuple(center_coords)] = 1
-        gaussian_weights = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
-        gaussian_weights[gaussian_weights == 0] = np.min(gaussian_weights[gaussian_weights != 0])
-        return gaussian_weights
 
 
 if __name__ == '__main__':

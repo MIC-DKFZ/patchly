@@ -1,8 +1,7 @@
 import unittest
 import numpy as np
 import zarr
-from samplify import GridSampler, Aggregator, slicer, SamplingMode
-from scipy.ndimage.filters import gaussian_filter
+from samplify import GridSampler, Aggregator, SamplingMode
 import copy
 
 

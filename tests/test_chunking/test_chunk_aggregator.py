@@ -1,8 +1,7 @@
 import unittest
 import numpy as np
 import zarr
-from samplify import GridSampler, Aggregator, slicer, SamplingMode
-from scipy.ndimage.filters import gaussian_filter
+from samplify import GridSampler, Aggregator, SamplingMode, utils
 import copy
 
 
@@ -168,7 +167,7 @@ class TestChunkAggregator(unittest.TestCase):
         image = np.random.random(spatial_size).astype(np.float32)
 
         expected_output = np.zeros_like(image, dtype=np.float32)
-        weights = self.create_gaussian_weights(np.asarray(patch_size)).astype(np.float32)
+        weights = utils.gaussian_kernel_numpy(np.asarray(patch_size), dtype=np.float32)
         weight_map = np.zeros_like(image, dtype=np.float32)
 
         for i, index in enumerate(range(0, spatial_size[0]-patch_offset[0], patch_offset[0])):
@@ -241,16 +240,6 @@ class TestChunkAggregator(unittest.TestCase):
                 np.testing.assert_almost_equal(np.array(image).argmax(axis=softmax_dim).astype(np.uint16), np.array(output2), decimal=6)
 
         return output1, output2
-
-    def create_gaussian_weights(self, size):
-        sigma_scale = 1. / 8
-        sigmas = size * sigma_scale
-        center_coords = size // 2
-        tmp = np.zeros(size)
-        tmp[tuple(center_coords)] = 1
-        gaussian_weights = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
-        gaussian_weights[gaussian_weights == 0] = np.min(gaussian_weights[gaussian_weights != 0])
-        return gaussian_weights
 
 
 if __name__ == '__main__':

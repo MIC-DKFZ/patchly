@@ -11,7 +11,9 @@ def create_array_like(array_type, data, device=None):
     elif array_type == zarr.core.Array:
         return NumpyArray(data, device)
     elif array_type == torch.Tensor:
-        return TensorArray(torch.tensor(data), device)
+        if data is not None:
+            data = torch.tensor(data)
+        return TensorArray(data, device)
     else:
         raise RuntimeError("Given ArrayLike ({}) is not supported.".format(array_type))
 
@@ -173,13 +175,13 @@ class TensorArray(ArrayLike):
     def create_zeros(self, shape, dtype=None):
         if isinstance(dtype, str):
             dtype = self.dtype_map[dtype]
-        self.data = torch.zeros(shape, dtype, device=self.device)
+        self.data = torch.zeros(tuple(shape), dtype=dtype, device=self.device)
         return self
 
     def create_ones(self, shape, dtype=None):
         if isinstance(dtype, str):
             dtype = self.dtype_map[dtype]
-        self.data = torch.ones(shape, dtype=dtype, device=self.device)
+        self.data = torch.ones(tuple(shape), dtype=dtype, device=self.device)
         return self
     
     def create_gaussian_kernel(self, shape, sigma=1./8, dtype=None):

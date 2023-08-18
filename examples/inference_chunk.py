@@ -1,6 +1,5 @@
 import numpy as np
 from samplify import GridSampler, Aggregator
-from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
 import torch
 
@@ -29,7 +28,7 @@ def example():
 
     # Run inference
     with torch.no_grad():
-        for patch, patch_bbox in tqdm(loader):
+        for patch, patch_bbox in loader:
             patch_prediction = model(patch)
             aggregator.append(patch_prediction, patch_bbox)
 

@@ -8,9 +8,6 @@ setup(name='samplify',
       author_email='karol.gotkowski@dkfz.de',
       license='private - atm',
       install_requires=[
-            "numpy>=1.20",
-            "scikit-image",
-            "tqdm",
-            'zarr'
+            "numpy>=1.20"
       ],
       zip_safe=False)

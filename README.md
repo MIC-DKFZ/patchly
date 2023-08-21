@@ -1,10 +1,10 @@
-# Samplify
+# Patchly
 
-Samplify is a grid sampler for N-dimensional images enabling inference and other processing steps on extremely large images. Especially for 3D images, it has been proven successfully to inference large images patch-wise in a sliding-window approach. Samplify does just that with a very simple interface to sample and aggregate images.
+Patchly is a grid sampler for N-dimensional images enabling inference and other processing steps on extremely large images. Especially for 3D images, it has been proven successfully to inference large images patch-wise in a sliding-window approach. Patchly does just that with a very simple interface to sample and aggregate images.
 
 ## Features
 
-Samplify supports:
+Patchly supports:
 - N-dimensional images (1D, 2D, 3D, ...)
 - Sampling and aggregation of images
 - Any array-like images (Numpy, Tensor, Zarr, Dask, ...)
@@ -16,19 +16,19 @@ Samplify supports:
 
 ## Installation
 
-<!-- You can install `samplify` via [pip]:
+<!-- You can install `patchly` via [pip]:
 
-    pip install samplify -->
+    pip install patchly -->
 
-To install Samplify, you'll first need to clone the repository to your local machine.
+To install Patchly, you'll first need to clone the repository to your local machine.
 
 1. Open your terminal and clone the repository:
     ```cmd
-    git clone https://github.com/MIC-DKFZ/samplify.git
+    git clone https://github.com/MIC-DKFZ/patchly.git
     ```
 2. Navigate into the cloned repository:
     ```cmd
-    cd samplify
+    cd patchly
     ```
 3. Install the project using pip:
     ```cmd
@@ -37,7 +37,7 @@ To install Samplify, you'll first need to clone the repository to your local mac
 
 ## Usage
 
-Demonstration on how to use Samplify for sliding-window patchification and subsequent aggregation:
+Demonstration on how to use Patchly for sliding-window patchification and subsequent aggregation:
 ```python
 sampler = GridSampler(spatial_size, patch_size, patch_offset, image)
 aggregator = Aggregator(sampler, output_size)
@@ -50,11 +50,11 @@ prediction = aggregator.get_output()
 
 ## Example
 
-Working example for inference of a 2D RGB image with Samplify in PyTorch:
+Working example for inference of a 2D RGB image with Patchly in PyTorch:
 ```python
 import numpy as np
-from samplify.sampler import GridSampler
-from samplify.aggregator import Aggregator
+from patchly.sampler import GridSampler
+from patchly.aggregator import Aggregator
 from torch.utils.data import DataLoader, Dataset
 import torch
 
@@ -99,14 +99,14 @@ print("Prediction shape: ", prediction.shape)
 ## License
 
 Distributed under the terms of the [Apache Software License 2.0] license,
-"Samplify" is free and open source software
+"Patchly" is free and open source software
 
 # Acknowledgements
 <img src="HI_Logo.png" height="100px" />
 
 <img src="dkfz_logo.png" height="100px" />
 
-Samplify is developed and maintained by the Applied Computer Vision Lab (ACVL) of [Helmholtz Imaging](http://helmholtz-imaging.de) 
+Patchly is developed and maintained by the Applied Computer Vision Lab (ACVL) of [Helmholtz Imaging](http://helmholtz-imaging.de) 
 and the [Division of Medical Image Computing](https://www.dkfz.de/en/mic/index.php) at the 
 [German Cancer Research Center (DKFZ)](https://www.dkfz.de/en/index.html).
 

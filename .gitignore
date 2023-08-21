@@ -1,8 +1,10 @@
 
 .idea/
 
-samplify.egg-info/
+patchly.egg-info/
 
-samplify/__pycache__/
+patchly/__pycache__/
 
 __pycache__/
+
+dist/

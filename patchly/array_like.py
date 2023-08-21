@@ -1,6 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from samplify.utils import gaussian_kernel_numpy, gaussian_kernel_pytorch
+from patchly.utils import gaussian_kernel_numpy, gaussian_kernel_pytorch
 
 try:
     import torch

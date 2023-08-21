@@ -1,5 +1,5 @@
 import numpy as np
-from samplify import GridSampler, Aggregator
+from patchly import GridSampler, Aggregator
 from torch.utils.data import DataLoader, Dataset
 import torch
 

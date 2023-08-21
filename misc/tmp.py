@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import zarr
-from samplify import GridSampler, Aggregator, SamplingMode
+from patchly import GridSampler, Aggregator, SamplingMode
 import copy
 
 

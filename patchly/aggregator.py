@@ -25,7 +25,7 @@ class PatchStatus(Enum):
 
 class Aggregator:
     def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
-                 weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None, has_batch_dim: Optional[str] = False, spatial_first: bool = True, device = 'cpu'):
+                 weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None, has_batch_dim: bool = False, spatial_first: bool = True, device = 'cpu'):
         self.sampler = sampler
         self.image_size_s = sampler.image_size_s
         self.patch_size_s = sampler.patch_size_s
@@ -143,7 +143,7 @@ class Aggregator:
 
 class _Aggregator:
     def __init__(self, sampler: GridSampler, image_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike],
-                 output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, softmax_dim: Optional[int] = None, has_batch_dim: Optional[str] = False,
+                 output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, softmax_dim: Optional[int] = None, has_batch_dim: bool = False,
                  weight_patch_s: npt.ArrayLike = None, weight_map_s: npt.ArrayLike = None, device = 'cpu', array_type = None):
         """
         Aggregator to assemble an image with continuous content from patches. The content of overlapping patches is averaged.
@@ -265,7 +265,7 @@ class _Aggregator:
 class _ChunkAggregator(_Aggregator):
     def __init__(self, sampler: GridSampler, image_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_offset_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
                  output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True,
-                 softmax_dim: Optional[int] = None, has_batch_dim: Optional[str] = False, weight_patch_s: npt.ArrayLike = None, device = 'cpu', array_type = None):
+                 softmax_dim: Optional[int] = None, has_batch_dim: bool = False, weight_patch_s: npt.ArrayLike = None, device = 'cpu', array_type = None):
         """
         Weighted aggregator to assemble an image with continuous content from patches. Returns the maximum class at each position of the image. The content of overlapping patches is gaussian-weighted by default.
         Can be used in conjunction with the GridSampler during inference to assemble the image-predictions from the patch-predictions.

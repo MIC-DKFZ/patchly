@@ -188,12 +188,16 @@ class TensorArray(ArrayLike):
         return self
 
     def create_ones(self, shape, dtype=None):
-        if isinstance(dtype, str):
+        if isinstance(dtype, str) or isinstance(dtype, np.dtype):
+            dtype = str(dtype)
             dtype = self.dtype_map[dtype]
         self.data = torch.ones(tuple(shape), dtype=dtype, device=self.device)
         return self
     
     def create_gaussian_kernel(self, shape, sigma=1./8, dtype=None):
+        if isinstance(dtype, str) or isinstance(dtype, np.dtype):
+            dtype = str(dtype)
+            dtype = self.dtype_map[dtype]
         self.data = gaussian_kernel_pytorch(shape, sigma, self.device, dtype)
         return self
     
@@ -211,7 +215,8 @@ class TensorArray(ArrayLike):
         return self.data.dtype
  
     def astype(self, dtype):
-        if isinstance(dtype, str):
+        if isinstance(dtype, str) or isinstance(dtype, np.dtype):
+            dtype = str(dtype)
             dtype = self.dtype_map[dtype]
         return TensorArray(self.data.to(dtype=dtype), self.device)
    

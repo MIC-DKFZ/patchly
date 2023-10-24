@@ -50,12 +50,15 @@ jobs:
 
       - name: Coverage
         uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
 
   deploy:
     # this will run when you have tagged a commit, starting with "v*"
     # and requires that you have put your twine API key in your
     # github secrets (see readme for details)
-    # needs: [test]
+    needs: [test]
     runs-on: ubuntu-latest
     if: contains(github.ref, 'tags')
     steps:

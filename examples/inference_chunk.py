@@ -12,11 +12,11 @@ def example():
     image = np.random.random((3, 1000, 1000))  # Channel, Width, Height
     spatial_size = image.shape[-2:]
     patch_size = (100, 100)
-    patch_offset = (50, 50)
+    step_size = (50, 50)
     chunk_size = (500, 500)
 
     # Init GridSampler
-    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=False)
+    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=False)
     # Convert sampler into a PyTorch dataset
     loader = SamplerDataset(sampler)
     # Init dataloader

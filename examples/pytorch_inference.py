@@ -7,7 +7,7 @@ import torch
 
 def example():
     # Init GridSampler
-    sampler = GridSampler(image=np.random.random((1000, 1000, 3)), spatial_size=(1000, 1000), patch_size=(100, 100), patch_offset=(50, 50))
+    sampler = GridSampler(image=np.random.random((1000, 1000, 3)), spatial_size=(1000, 1000), patch_size=(100, 100), step_size=(50, 50))
     # Init dataloader
     loader = DataLoader(ExampleDataset(sampler), batch_size=4, num_workers=0, shuffle=False)
     # Init aggregator

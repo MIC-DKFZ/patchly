@@ -29,7 +29,7 @@ class Aggregator:
         self.sampler = sampler
         self.image_size_s = sampler.image_size_s
         self.patch_size_s = sampler.patch_size_s
-        self.patch_offset_s = sampler.patch_offset_s
+        self.step_size_s = sampler.step_size_s
         self.chunk_size_s = chunk_size
         self.spatial_first = spatial_first
         self.mode = sampler.mode
@@ -114,7 +114,7 @@ class Aggregator:
                                   output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, has_batch_dim=self.has_batch_dim, 
                                   weight_patch_s=self.weight_patch_s, weight_map_s=self.weight_map_s, device=self.device, array_type=self.array_type)
         elif self.mode.name.startswith('SAMPLE_') and self.chunk_size_s is not None:
-            aggregator = _ChunkAggregator(sampler=sampler, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s,
+            aggregator = _ChunkAggregator(sampler=sampler, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, step_size_s=self.step_size_s,
                                        chunk_size_s=self.chunk_size_s, output_h=output_h, spatial_first=self.spatial_first, softmax_dim=softmax_dim, 
                                        has_batch_dim=self.has_batch_dim, weight_patch_s=self.weight_patch_s, device=self.device, array_type=self.array_type)
         elif self.mode.name.startswith('PAD_') and self.chunk_size_s is None:
@@ -263,7 +263,7 @@ class _Aggregator:
 
 
 class _ChunkAggregator(_Aggregator):
-    def __init__(self, sampler: GridSampler, image_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], patch_offset_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
+    def __init__(self, sampler: GridSampler, image_size_s: Union[Tuple, npt.ArrayLike], patch_size_s: Union[Tuple, npt.ArrayLike], step_size_s: Union[Tuple, npt.ArrayLike], chunk_size_s: Union[Tuple, npt.ArrayLike],
                  output_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True,
                  softmax_dim: Optional[int] = None, has_batch_dim: bool = False, weight_patch_s: npt.ArrayLike = None, device = 'cpu', array_type = None):
         """
@@ -278,7 +278,7 @@ class _ChunkAggregator(_Aggregator):
         """
         super().__init__(sampler=sampler, image_size_s=image_size_s, patch_size_s=patch_size_s, output_h=output_h, spatial_first=spatial_first, 
                          softmax_dim=softmax_dim, has_batch_dim=has_batch_dim, weight_patch_s=weight_patch_s, weight_map_s=None, device=device, array_type=array_type)
-        self.patch_offset_s = patch_offset_s
+        self.step_size_s = step_size_s
         self.chunk_size_s = chunk_size_s
         self.chunk_dtype = self.set_chunk_dtype()
         self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict = self.compute_patches()
@@ -292,7 +292,7 @@ class _ChunkAggregator(_Aggregator):
 
     def compute_patches(self):
         patch_sampler = self.sampler
-        chunk_sampler = _AdaptiveGridSampler(image_size_s=self.image_size_s, patch_size_s=self.chunk_size_s, patch_offset_s=self.chunk_size_s)
+        chunk_sampler = _AdaptiveGridSampler(image_size_s=self.image_size_s, patch_size_s=self.chunk_size_s, step_size_s=self.chunk_size_s)
         chunk_patch_dict = defaultdict(dict)
         patch_chunk_dict = defaultdict(dict)
         

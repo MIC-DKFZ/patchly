@@ -5,9 +5,9 @@ from patchly import GridSampler, Aggregator, SamplingMode
 import copy
 
 
-def _test_aggregator(image, spatial_size, patch_size, patch_offset=None, spatial_first_sampler=True, spatial_first_aggregator=True, output=None, weights='avg', multiply_patch_by_index=False, softmax_dim=None):        
+def _test_aggregator(image, spatial_size, patch_size, step_size=None, spatial_first_sampler=True, spatial_first_aggregator=True, output=None, weights='avg', multiply_patch_by_index=False, softmax_dim=None):        
         # Test with output size
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_SQUEEZE)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_SQUEEZE)
         aggregator = Aggregator(sampler=sampler, output_size=image.shape, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):
@@ -28,7 +28,7 @@ def _test_aggregator(image, spatial_size, patch_size, patch_offset=None, spatial
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_SQUEEZE)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_SQUEEZE)
         aggregator = Aggregator(sampler=sampler, output=output, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):
@@ -48,9 +48,9 @@ def _test_aggregator(image, spatial_size, patch_size, patch_offset=None, spatial
 
         return output1, output2
 
-patch_offset = (3, 3)
+step_size = (3, 3)
 patch_size = (10, 10)
 spatial_size = (103, 107)
 image = np.random.random(spatial_size)
 
-_test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+_test_aggregator(image, spatial_size, patch_size, step_size=step_size)

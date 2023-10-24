@@ -15,7 +15,7 @@ class SamplingMode(Enum):
 
 
 class GridSampler:
-    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], patch_offset: Optional[Union[Tuple, npt.ArrayLike]] = None,
+    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], step_size: Optional[Union[Tuple, npt.ArrayLike]] = None,
                  image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_SQUEEZE, pad_kwargs: dict = None):
         """
         TODO description
@@ -25,7 +25,7 @@ class GridSampler:
         The image can have an arbitrary number of additional non-spatial dimensions.
         :param spatial_size: The spatial shape of the image. The spatial shape excludes the channel, batch and any other non-spatial dimensionality.
         :param patch_size: The spatial shape of the patch. The patch shape excludes the channel, batch and any other non-spatial dimensionality.
-        :param patch_offset: The spatial shape of the patch offset. If None then the patch offset is equal to the patch size.
+        :param step_size: The spatial shape of the patch offset. If None then the patch offset is equal to the patch size.
         The patch offset excludes the channel, batch and any other non-spatial dimensionality.
         This enables patch sampling of larger-than-RAM images in combination with memory-mapped arrays. The chunk size is required to be a multiple of the patch size.
         The chunk size excludes the channel, batch and any other non-spatial dimensionality. An in-depth explanation of chunk sampling can be found here: LINK
@@ -36,7 +36,7 @@ class GridSampler:
         self.image_h = image
         self.image_size_s = np.asarray(spatial_size)
         self.patch_size_s = np.asarray(patch_size)
-        self.patch_offset_s = self.set_patch_offset(patch_offset, patch_size)
+        self.step_size_s = self.set_step_size(step_size, patch_size)
         self.spatial_first = spatial_first
         self.mode = mode
         self.pad_kwargs = pad_kwargs
@@ -44,12 +44,12 @@ class GridSampler:
         self.check_sanity()
         self.sampler = self.create_sampler()
 
-    def set_patch_offset(self, patch_offset_s, patch_size_s):
-        if patch_offset_s is None:
-            patch_offset_s = patch_size_s
+    def set_step_size(self, step_size_s, patch_size_s):
+        if step_size_s is None:
+            step_size_s = patch_size_s
         else:
-            patch_offset_s = np.asarray(patch_offset_s)
-        return patch_offset_s
+            step_size_s = np.asarray(step_size_s)
+        return step_size_s
 
     def check_sanity(self):
         if self.image_h is not None and not hasattr(self.image_h, '__getitem__'):
@@ -60,30 +60,30 @@ class GridSampler:
             raise RuntimeError("The spatial size of the given image {} is unequal to the given spatial size {}.".format(self.image_h.shape[-len(self.image_size_s):], self.image_size_s))
         if np.any(self.patch_size_s > self.image_size_s):
             raise RuntimeError("The patch size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.patch_size_s, self.image_size_s))
-        if self.patch_offset_s is not None and np.any(self.patch_offset_s > self.patch_size_s):
-            raise RuntimeError("The patch offset ({}) cannot be greater than the patch size ({}) in one or more dimensions.".format(self.patch_offset_s, self.patch_size_s))
+        if self.step_size_s is not None and np.any(self.step_size_s > self.patch_size_s):
+            raise RuntimeError("The patch offset ({}) cannot be greater than the patch size ({}) in one or more dimensions.".format(self.step_size_s, self.patch_size_s))
         if len(self.image_size_s) != len(self.patch_size_s):
             raise RuntimeError("The dimensionality of the patch size ({}) is required to be the same as the spatial size ({})."
                                .format(self.patch_size_s, self.image_size_s))
-        if self.patch_offset_s is not None and len(self.image_size_s) != len(self.patch_offset_s):
+        if self.step_size_s is not None and len(self.image_size_s) != len(self.step_size_s):
             raise RuntimeError("The dimensionality of the patch offset ({}) is required to be the same as the spatial size ({})."
-                               .format(self.patch_offset_s, self.image_size_s))
+                               .format(self.step_size_s, self.image_size_s))
         if self.mode.name.startswith('PAD_') and (self.image_h is None or not isinstance(self.image_h, np.ndarray)):
             raise RuntimeError("The given sampling mode ({}) requires the image to be given and as type np.ndarray.".format(self.mode))
         
     def create_sampler(self):
         if self.mode == SamplingMode.SAMPLE_EDGE:
-            sampler = _EdgeGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _EdgeGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, step_size_s=self.step_size_s, spatial_first=self.spatial_first)
         elif self.mode == SamplingMode.SAMPLE_ADAPTIVE:
-            sampler = _AdaptiveGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _AdaptiveGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, step_size_s=self.step_size_s, spatial_first=self.spatial_first)
         elif self.mode == SamplingMode.SAMPLE_CROP:
-            sampler = _CropGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _CropGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, step_size_s=self.step_size_s, spatial_first=self.spatial_first)
         elif self.mode == SamplingMode.SAMPLE_SQUEEZE:
-            sampler = _SqueezeGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _SqueezeGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, step_size_s=self.step_size_s, spatial_first=self.spatial_first)
         elif self.mode.name.startswith('PAD_'):
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
             self.pad_image()
-            sampler = _CropGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, patch_offset_s=self.patch_offset_s, spatial_first=self.spatial_first)
+            sampler = _CropGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, step_size_s=self.step_size_s, spatial_first=self.spatial_first)
         else:
             raise NotImplementedError("The given sampling mode ({}) is not supported.".format(self.mode))
         return sampler
@@ -131,11 +131,11 @@ class GridSampler:
 
 
 class _CropGridSampler:
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
         TODO Redo doc
 
-        An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have offset if patch_offset is specified.
+        An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have offset if step_size is specified.
         If patch_size is not a multiple of image_size then the remainder part of the image is not sampled.
         The grid sampler only returns image patches if image is set.
         Otherwise, only the patch bbox w_start, w_end, h_start, h_end, d_start, d_end are returned. They can be used to extract the patch from the image like this:
@@ -146,19 +146,19 @@ class _CropGridSampler:
         If None then patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
         :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
-        :param patch_offset: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
+        :param step_size: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
         """
         self.image_h = image_h
         self.image_size_s = image_size_s
         self.patch_size_s = patch_size_s
-        self.patch_offset_s = patch_offset_s
+        self.step_size_s = step_size_s
         self.spatial_first = spatial_first
         self.patch_positions_s, self.patch_sizes_s = self.compute_patches()
 
     def compute_patches(self):
         n_axis_s = len(self.image_size_s)
         stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
-        axis_positions_s = [np.arange(0, stop_s[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = [np.arange(0, stop_s[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]
         patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
         axis_positions_s = np.meshgrid(*axis_positions_s, indexing='ij')
         patch_sizes_s = np.meshgrid(*patch_sizes_s, indexing='ij')
@@ -204,11 +204,11 @@ class _CropGridSampler:
 
 
 class _EdgeGridSampler(_CropGridSampler):
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
         TODO Redo doc
 
-        An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have offset if patch_offset is specified.
+        An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have offset if step_size is specified.
         If patch_size is not a multiple of image_size then the remainder part of the image is not padded, but instead patches are sampled at the edge of the image of size patch_size like this:
         ----------------------
         |                | X |
@@ -227,14 +227,14 @@ class _EdgeGridSampler(_CropGridSampler):
         If None then patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
         :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
         :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
-        :param patch_offset: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
+        :param step_size: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
         """
-        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
+        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
         n_axis_s = len(self.image_size_s)
         stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
-        axis_positions_s = [np.arange(0, stop_s[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = [np.arange(0, stop_s[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]
         for axis in range(n_axis_s):
             if axis_positions_s[axis][-1] != self.image_size_s[axis] - self.patch_size_s[axis]:
                 axis_positions_s[axis] = np.append(axis_positions_s[axis], [self.image_size_s[axis] - self.patch_size_s[axis]],
@@ -248,18 +248,18 @@ class _EdgeGridSampler(_CropGridSampler):
 
 
 class _AdaptiveGridSampler(_CropGridSampler):
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, min_patch_size_s: np.ndarray = None):
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, min_patch_size_s: np.ndarray = None):
         # TODO: When used in ChunkedGridSampler the adaptive patches should have a minimum size of patch size
         # TODO: Do doc
         self.min_patch_size_s = min_patch_size_s
         if self.min_patch_size_s is not None and np.any(self.min_patch_size_s > patch_size_s):
             raise RuntimeError("The minimum patch size ({}) cannot be greater than the actual patch size ({}) in one or more dimensions.".format(self.min_patch_size_s, patch_size_s))
-        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
+        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
         n_axis_s = len(self.image_size_s)
         stop = [self.image_size_s[axis] for axis in range(n_axis_s)]
-        axis_positions_s = [np.arange(0, stop[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = [np.arange(0, stop[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]
         patch_sizes_s = [[self.patch_size_s[axis]] * len(axis_positions_s[axis]) for axis in range(n_axis_s)]
         for axis in range(n_axis_s):
             for index in range(len(axis_positions_s[axis])):
@@ -278,16 +278,16 @@ class _AdaptiveGridSampler(_CropGridSampler):
 
 
 class _SqueezeGridSampler(_CropGridSampler):
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, patch_offset_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
-        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, patch_offset_s=patch_offset_s, image_h=image_h, spatial_first=spatial_first)
+    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+        super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
         n_axis_s = len(self.image_size_s)
         stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
-        axis_positions_s = [np.arange(0, stop_s[axis], self.patch_offset_s[axis]) for axis in range(n_axis_s)]
+        axis_positions_s = [np.arange(0, stop_s[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]
         for axis in range(n_axis_s):
             if axis_positions_s[axis][-1] + self.patch_size_s[axis] < self.image_size_s[axis]:
-                axis_positions_s[axis] = np.concatenate((axis_positions_s[axis], [axis_positions_s[axis][-1] + self.patch_offset_s[axis]]))
+                axis_positions_s[axis] = np.concatenate((axis_positions_s[axis], [axis_positions_s[axis][-1] + self.step_size_s[axis]]))
         axis_squeeze_s = [(axis_positions_s[axis][-1] + self.patch_size_s[axis]) - self.image_size_s[axis] for axis in range(n_axis_s)]  ###
         additional_offset_s = [axis_squeeze_s[axis] // (len(axis_positions_s[axis]) - 1) for axis in range(n_axis_s)]
         remainder_offset_s = [axis_squeeze_s[axis] % (len(axis_positions_s[axis]) - 1) for axis in range(n_axis_s)]

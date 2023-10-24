@@ -1,4 +1,4 @@
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 from patchly.sampler import GridSampler, SamplingMode
 from patchly.aggregator import Aggregator

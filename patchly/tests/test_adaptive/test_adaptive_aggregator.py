@@ -22,28 +22,28 @@ class TestAdaptiveAggregator(unittest.TestCase):
         self._test_aggregator(image, spatial_size, patch_size)
 
     def test_with_offset_without_remainder_2d(self):
-        patch_offset = (5, 5)
+        step_size = (5, 5)
         patch_size = (10, 10)
         spatial_size = (100, 100)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+        self._test_aggregator(image, spatial_size, patch_size, step_size=step_size)
 
     def test_with_offset_with_remainder_2d(self):
-        patch_offset = (5, 5)
+        step_size = (5, 5)
         patch_size = (10, 10)
         spatial_size = (103, 107)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+        self._test_aggregator(image, spatial_size, patch_size, step_size=step_size)
 
     def test_with_offset_with_remainder_2d_v2(self):
-        patch_offset = (3, 3)
+        step_size = (3, 3)
         patch_size = (10, 10)
         spatial_size = (103, 107)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+        self._test_aggregator(image, spatial_size, patch_size, step_size=step_size)
 
     def test_without_offset_without_remainder_3d(self):
         patch_size = (10, 10, 5)
@@ -60,20 +60,20 @@ class TestAdaptiveAggregator(unittest.TestCase):
         self._test_aggregator(image, spatial_size, patch_size)
 
     def test_with_offset_without_remainder_3d(self):
-        patch_offset = (5, 5, 5)
+        step_size = (5, 5, 5)
         patch_size = (10, 10, 5)
         spatial_size = (100, 100, 50)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+        self._test_aggregator(image, spatial_size, patch_size, step_size=step_size)
 
     def test_with_offset_with_remainder_3d(self):
-        patch_offset = (5, 5, 5)
+        step_size = (5, 5, 5)
         patch_size = (10, 10, 5)
         spatial_size = (103, 107, 51)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+        self._test_aggregator(image, spatial_size, patch_size, step_size=step_size)
 
     def test_without_offset_without_remainder_Nd(self):
         patch_size = (2, 8, 4, 4, 4)
@@ -90,20 +90,20 @@ class TestAdaptiveAggregator(unittest.TestCase):
         self._test_aggregator(image, spatial_size, patch_size)
 
     def test_with_offset_without_remainder_Nd(self):
-        patch_offset = (1, 8, 2, 2, 2)
+        step_size = (1, 8, 2, 2, 2)
         patch_size = (2, 8, 4, 4, 4)
         spatial_size = (4, 16, 8, 8, 4)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+        self._test_aggregator(image, spatial_size, patch_size, step_size=step_size)
 
     def test_with_offset_with_remainder_Nd(self):
-        patch_offset = (1, 8, 2, 2, 2)
+        step_size = (1, 8, 2, 2, 2)
         patch_size = (2, 8, 4, 4, 4)
         spatial_size = (5, 18, 9, 10, 6)
         image = np.random.random(spatial_size)
 
-        self._test_aggregator(image, spatial_size, patch_size, patch_offset=patch_offset)
+        self._test_aggregator(image, spatial_size, patch_size, step_size=step_size)
 
     def test_channel_first(self):
         patch_size = (10, 10)
@@ -163,7 +163,7 @@ class TestAdaptiveAggregator(unittest.TestCase):
 
     def test_gaussian_weights(self):
         patch_size = (10, 10)
-        patch_offset = (5, 10)
+        step_size = (5, 10)
         spatial_size = (20, 10)
         image = np.random.random(spatial_size)
 
@@ -180,7 +180,7 @@ class TestAdaptiveAggregator(unittest.TestCase):
         expected_output /= weight_map
         expected_output = np.nan_to_num(expected_output)
 
-        self.assertRaises(RuntimeError, self._test_aggregator, image=image, spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, weights='gaussian', multiply_patch_by_index=True)
+        self.assertRaises(RuntimeError, self._test_aggregator, image=image, spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, weights='gaussian', multiply_patch_by_index=True)
 
     def test_softmax(self):
         patch_size = (10, 10)
@@ -192,9 +192,9 @@ class TestAdaptiveAggregator(unittest.TestCase):
 
         self._test_aggregator(image, spatial_size, patch_size, spatial_first_sampler=spatial_first_sampler, spatial_first_aggregator=spatial_first_aggregator, output=output, softmax_dim=0)
 
-    def _test_aggregator(self, image, spatial_size, patch_size, patch_offset=None, spatial_first_sampler=True, spatial_first_aggregator=True, output=None, weights='avg', multiply_patch_by_index=False, softmax_dim=None):        
+    def _test_aggregator(self, image, spatial_size, patch_size, step_size=None, spatial_first_sampler=True, spatial_first_aggregator=True, output=None, weights='avg', multiply_patch_by_index=False, softmax_dim=None):        
         # Test with output size
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_ADAPTIVE)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_ADAPTIVE)
         aggregator = Aggregator(sampler=sampler, output_size=image.shape, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):
@@ -221,7 +221,7 @@ class TestAdaptiveAggregator(unittest.TestCase):
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, patch_offset=patch_offset, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_ADAPTIVE)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_ADAPTIVE)
         aggregator = Aggregator(sampler=sampler, output=output, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):

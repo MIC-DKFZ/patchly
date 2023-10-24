@@ -4,7 +4,6 @@
 [![PyPI](https://img.shields.io/pypi/v/patchly.svg?color=green)](https://pypi.org/project/patchly)
 [![Python Version](https://img.shields.io/pypi/pyversions/patchly.svg?color=green)](https://python.org)
 [![tests](https://github.com/Karol-G/patchly/workflows/tests/badge.svg)](https://github.com/Karol-G/patchly/actions)
-[![codecov](https://codecov.io/gh/Karol-G/patchly/branch/main/graph/badge.svg)](https://codecov.io/gh/Karol-G/patchly)
 
 Patchly is a grid sampler for N-dimensional images enabling inference and other processing steps on extremely large images. Especially for 3D images, it has been proven successfully to inference large images patch-wise in a sliding-window approach. Patchly does just that with a very simple interface to sample and aggregate images.
 
@@ -89,7 +88,7 @@ print("Prediction shape: ", prediction.shape)
 
 ## License
 
-Distributed under the terms of the [Apache Software License 2.0] license,
+Distributed under the terms of the [Apache Software License 2.0](http://www.apache.org/licenses/LICENSE-2.0) license,
 "Patchly" is free and open source software
 
 # Acknowledgements

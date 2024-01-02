@@ -9,17 +9,23 @@
 
 Patchly is a grid sampler for N-dimensional images enabling inference and other processing steps on extremely large images. Especially for 3D images, it has been proven successfully to inference large images patch-wise in a sliding-window approach. Patchly does just that with a very simple interface to sample and aggregate images.
 
-## Features
+The main functionalities of Patchly consist of a Sampler, which samples patches from an image based on a grid, and an Aggregator, which assembles the patches back into the shape of the original image. There is a multitude of libraries providing similar functionality already. However, they tend to work only for a limited number of usage scenarios before becoming unusable. 
 
-Patchly supports:
-- N-dimensional images (1D, 2D, 3D, ...)
-- Sampling and aggregation of images
-- Any array-like images (Numpy, Tensor, Zarr, Dask, ...)
-- Memory-mapped images
-- Patch overlap (here referred to as patch offset)
-- All numpy padding techniques
-- Images with non-spatial dimensions (color dimension, batch dimension, etc)
-- Chunk sampling to minimize memory consumption
+Patchly is the first library providing an advanced set of features for users working with sophisticated image processing pipelines requiring patch-based processing.
+
+A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found [here](OVERVIEW.md).
+
+## Feature Summary
+
+Patchly provides the following advanced features:
+- N-dimensional image handling (1D, 2D, 3D, ...)
+- Multiple border-handling strategies
+- Support for any array-like images (Numpy, Tensor, Zarr, Dask, ...)
+- Memory-mapped image support
+- Patch overlap
+- ~~Numpy padding techniques~~
+- Support for images with non-spatial dimensions (color dimension, batch dimension, ...)
+- Chunk aggregation to minimize memory consumption
 
 ## Installation
 

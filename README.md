@@ -100,9 +100,9 @@ Distributed under the terms of the [Apache Software License 2.0](http://www.apac
 "Patchly" is free and open source software
 
 # Acknowledgements
-<img src="https://github.com/MIC-DKFZ/patchly/raw/main/HI_Logo.png" height="100px" />
+<img src="https://github.com/MIC-DKFZ/patchly/raw/main/resources/HI_Logo.png" height="100px" />
 
-<img src="https://github.com/MIC-DKFZ/patchly/raw/main/dkfz_logo.png" height="100px" />
+<img src="https://github.com/MIC-DKFZ/patchly/raw/main/resources/dkfz_logo.png" height="100px" />
 
 Patchly is developed and maintained by the Applied Computer Vision Lab (ACVL) of [Helmholtz Imaging](http://helmholtz-imaging.de) 
 and the [Division of Medical Image Computing](https://www.dkfz.de/en/mic/index.php) at the 

@@ -29,6 +29,8 @@ class Aggregator:
         """
         Initializes the Aggregator object for aggregating patches into a larger output image.
 
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
+
         :param sampler: GridSampler - The sampler used to sample patches from the input image.
         :param output_size: Optional[Union[Tuple, npt.ArrayLike]] - The size of the output image. Can be None if output is provided.
         :param output: Optional[npt.ArrayLike] - The array to store the aggregated output. Can be None if output_size is provided.
@@ -215,6 +217,8 @@ class _Aggregator:
         """
         Initializes the _Aggregator object, a private class for handling patch aggregation.
 
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
+
         :param sampler: GridSampler - The sampler used to generate patches.
         :param image_size_s: Union[Tuple, npt.ArrayLike] - The size of the image in spatial dimensions.
         :param patch_size_s: Union[Tuple, npt.ArrayLike] - The size of each patch in spatial dimensions.
@@ -352,6 +356,8 @@ class _ChunkAggregator(_Aggregator):
              softmax_dim: Optional[int] = None, has_batch_dim: bool = False, weight_patch_s: npt.ArrayLike = None, device: str = 'cpu', array_type = None):
         """
         Initializes the _ChunkAggregator object, a subclass of _Aggregator, for managing patch aggregation in chunks.
+
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
         :param sampler: GridSampler - The sampler used for generating patches.
         :param image_size_s: Union[Tuple, npt.ArrayLike] - The size of the image in spatial dimensions.

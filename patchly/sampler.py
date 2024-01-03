@@ -15,23 +15,20 @@ class SamplingMode(Enum):
 
 
 class GridSampler:
-    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], step_size: Optional[Union[Tuple, npt.ArrayLike]] = None,
+    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], step_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
                  image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_SQUEEZE, pad_kwargs: dict = None):
         """
-        TODO description
-        If no image is given then only patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
+        Initializes the GridSampler object with specified parameters for sampling patches from an image.
 
-        :param image: The image in an array-like format (Numpy, Tensor, Zarr, Dask, ...) that can be memory-mapped.
-        The image can have an arbitrary number of additional non-spatial dimensions.
-        :param spatial_size: The spatial shape of the image. The spatial shape excludes the channel, batch and any other non-spatial dimensionality.
-        :param patch_size: The spatial shape of the patch. The patch shape excludes the channel, batch and any other non-spatial dimensionality.
-        :param step_size: The spatial shape of the patch offset. If None then the patch offset is equal to the patch size.
-        The patch offset excludes the channel, batch and any other non-spatial dimensionality.
-        This enables patch sampling of larger-than-RAM images in combination with memory-mapped arrays. The chunk size is required to be a multiple of the patch size.
-        The chunk size excludes the channel, batch and any other non-spatial dimensionality. An in-depth explanation of chunk sampling can be found here: LINK
-        :param spatial_first: Denotes that the spatial dimensions of the image are located before the non-spatial dimensions e.g. (Width, Height, Channel).
-        Otherwise, the reverse is true e.g. (Channel, Width, Height).
-        :param mode: TODO
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
+
+        :param spatial_size: Union[Tuple, npt.ArrayLike] - The size of the spatial dimensions of the image.
+        :param patch_size: Union[Tuple, npt.ArrayLike] - The size of the patches to be sampled.
+        :param step_size: Optional[Union[Tuple, npt.ArrayLike]] - The step size between patches. Defaults to the same as patch_size if None.
+        :param image: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
+        :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
+        :param mode: SamplingMode - The sampling mode to use, which affects how patch borders are handled. Defaults to SamplingMode.SAMPLE_SQUEEZE.
+        :param pad_kwargs: dict - Additional keyword arguments for numpy's pad function, used in certain padding modes. Defaults to None.
         """
         self.image_h = image
         self.image_size_s = np.asarray(spatial_size)
@@ -44,7 +41,14 @@ class GridSampler:
         self.check_sanity()
         self.sampler = self.create_sampler()
 
-    def set_step_size(self, step_size_s, patch_size_s):
+    def set_step_size(self, step_size_s: Union[Tuple, np.ndarray], patch_size_s: Union[Tuple, np.ndarray]) -> np.ndarray:
+        """
+        Sets the step size for patch sampling. If the step size is not provided, it defaults to the patch size.
+
+        :param step_size_s: Union[Tuple, np.ndarray] - The desired step size for sampling patches. If None, it will default to the patch size.
+        :param patch_size_s: Union[Tuple, np.ndarray] - The size of the patches to be sampled.
+        :return: np.ndarray - The adjusted or default step size.
+        """
         if step_size_s is None:
             step_size_s = patch_size_s
         else:
@@ -52,6 +56,10 @@ class GridSampler:
         return step_size_s
 
     def check_sanity(self):
+        """
+        Checks the sanity of the initialized GridSampler parameters. It validates the compatibility of the image, patch size, step size, and spatial dimensions. 
+        Raises runtime errors if any incompatibility or inconsistency is found in the provided parameters.
+        """
         if self.image_h is not None and not hasattr(self.image_h, '__getitem__'):
             raise RuntimeError("The given image is not ArrayLike.")
         if self.spatial_first and self.image_h is not None and (self.image_h.shape[:len(self.image_size_s)] != tuple(self.image_size_s)):
@@ -72,6 +80,11 @@ class GridSampler:
             raise RuntimeError("The given sampling mode ({}) requires the image to be given and as type np.ndarray.".format(self.mode))
         
     def create_sampler(self):
+        """
+        Creates an appropriate sampler based on the specified sampling mode. This method initializes different types of grid samplers like EdgeGridSampler, 
+        AdaptiveGridSampler, CropGridSampler, or SqueezeGridSampler depending on the mode selected during the GridSampler initialization. 
+        Raises NotImplementedError if an unsupported mode is specified.
+        """
         if self.mode == SamplingMode.SAMPLE_EDGE:
             sampler = _EdgeGridSampler(image_h=self.image_h, image_size_s=self.image_size_s, patch_size_s=self.patch_size_s, step_size_s=self.step_size_s, spatial_first=self.spatial_first)
         elif self.mode == SamplingMode.SAMPLE_ADAPTIVE:
@@ -89,6 +102,11 @@ class GridSampler:
         return sampler
 
     def pad_image(self):
+        """
+        Pads the image based on the selected padding mode and parameters. This method adjusts the image's shape according to the specified padding strategy,
+        applying numpy's pad function with the given pad_kwargs. It updates the image size and pad width attributes of the GridSampler instance.
+        Raises RuntimeError if an unsupported padding mode is provided.
+        """
         if self.mode.startswith('pad_end_'):
             pad_width_after = np.asarray(self.image_size_s) - np.asarray(self.image_h.shape)
             pad_width_after = np.clip(pad_width_after, a_min=0, a_max=None)
@@ -115,38 +133,57 @@ class GridSampler:
         self.pad_width = pad_width
 
     def __iter__(self):
+        """
+        Returns an iterator for the GridSampler. This method allows the GridSampler to be used in iterator contexts, enabling iteration over the sampled patches.
+        """
         return self.sampler.__iter__()
 
     def __len__(self):
+        """
+        Returns the total number of patches that will be sampled by the GridSampler. This method allows users to determine the number of patches that will be generated 
+        based on the initialized spatial size, patch size, and step size.
+        """
         return self.sampler.__len__()
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
+        """
+        Retrieves the patch and patch location at the specified index. This method allows for direct access to a specific patch based on its index in the sequence of all patches 
+        generated by the GridSampler.
+
+        :param idx: int - The index of the patch to retrieve.
+        :return: The patch and patch location at the specified index.
+        """
         return self.sampler.__getitem__(idx)
 
     def __next__(self):
+        """
+        Advances the iterator and returns the next patch in the sequence. This method is part of the iterator protocol, enabling the GridSampler to be used in 
+        contexts where an iterator is required, such as in a for loop.
+        """
         return self.sampler.__next__()
     
-    def _get_bbox(self, idx):
+    def _get_bbox(self, idx: int) -> np.ndarray:
+        """
+        Retrieves the bounding box coordinates of the patch at the specified index. This internal method is used to determine the spatial location of a patch within the larger image.
+
+        :param idx: int - The index of the patch for which the bounding box is required.
+        :return: np.ndarray - The bounding box coordinates of the specified patch.
+        """
         return self.sampler._get_bbox(idx)
 
 
 class _CropGridSampler:
     def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
-        TODO Redo doc
+        Initializes the _CropGridSampler object, a subclass of GridSampler, for sampling patches using the crop sampling strategy, discarding all patches extending over the image.
 
-        An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have offset if step_size is specified.
-        If patch_size is not a multiple of image_size then the remainder part of the image is not sampled.
-        The grid sampler only returns image patches if image is set.
-        Otherwise, only the patch bbox w_start, w_end, h_start, h_end, d_start, d_end are returned. They can be used to extract the patch from the image like this:
-        img = img[w_start:w_end, h_start:h_end, d_start:d_end] (Example for a 3D image)
-        Requiring only size parameters instead of the actual image makes the grid sampler file format independent if desired.
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
-        :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
-        If None then patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
-        :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
-        :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
-        :param step_size: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
+        :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
+        :param patch_size_s: np.ndarray - The size of the patches to be sampled.
+        :param step_size_s: np.ndarray - The step size between patches.
+        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
+        :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         """
         self.image_h = image_h
         self.image_size_s = image_size_s
@@ -156,6 +193,10 @@ class _CropGridSampler:
         self.patch_positions_s, self.patch_sizes_s = self.compute_patches()
 
     def compute_patches(self):
+        """
+        Computes the positions and sizes of patches to be sampled from the image. This method calculates the grid of patches based on the image size, patch size, 
+        and step size specified in the initializer of the _CropGridSampler. Discards all patches extending over the image.
+        """
         n_axis_s = len(self.image_size_s)
         stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
         axis_positions_s = [np.arange(0, stop_s[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]
@@ -167,18 +208,37 @@ class _CropGridSampler:
         return patch_positions_s, patch_sizes_s
 
     def __iter__(self):
+        """
+        Returns an iterator for the _CropGridSampler. This method initializes the iteration process, allowing the _CropGridSampler to be used in iterator contexts,
+        enabling iteration over the sampled patches.
+        """
         self.index = 0
         return self
 
     def __len__(self):
+        """
+        Returns the total number of patches that will be sampled by the _CropGridSampler. This method calculates the length based on the computed patch positions, 
+        allowing users to know the number of patches that will be generated for the image.
+        """
         return len(self.patch_positions_s)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
+        """
+        Retrieves the patch and patch location at the specified index from the _CropGridSampler. This method allows direct access to a specific patch, providing the sampled patch and 
+        its bounding box based on the index in the sequence of patches generated.
+
+        :param idx: int - The index of the patch to retrieve.
+        :return: The patch and patch location at the specified index.
+        """
         patch_bbox_s = self._get_bbox(idx)
         patch_result = self.get_patch_result(patch_bbox_s)
         return patch_result
 
     def __next__(self):
+        """
+        Advances the iterator and returns the next patch in the sequence from the _CropGridSampler. This method is part of the iterator protocol, enabling the 
+        _CropGridSampler to be iterated over in contexts like a for loop, providing patches sequentially.
+        """
         if self.index < self.__len__():
             output = self.__getitem__(self.index)
             self.index += 1
@@ -186,7 +246,14 @@ class _CropGridSampler:
         else:
             raise StopIteration
         
-    def _get_bbox(self, idx):
+    def _get_bbox(self, idx: int) -> np.ndarray:
+        """
+        Computes the bounding box for the patch at the specified index. This internal method calculates the spatial coordinates defining the area of the image 
+        covered by the patch, facilitating the extraction of the specific patch.
+
+        :param idx: int - The index of the patch for which the bounding box is needed.
+        :return: np.ndarray - The bounding box coordinates for the patch at the specified index.
+        """
         patch_position_s = self.patch_positions_s[idx]
         patch_bbox_s = np.zeros(len(patch_position_s) * 2, dtype=int).reshape(-1, 2)
         for axis in range(len(patch_bbox_s)):
@@ -194,7 +261,15 @@ class _CropGridSampler:
             patch_bbox_s[axis][1] = patch_position_s[axis] + self.patch_sizes_s[idx][axis]
         return patch_bbox_s
 
-    def get_patch_result(self, patch_bbox_s):
+    def get_patch_result(self, patch_bbox_s: np.ndarray):
+        """
+        Retrieves the patch from the image based on the provided bounding box coordinates. This method extracts the specified patch from the image, handling it 
+        according to the configuration of the _CropGridSampler, such as whether the image is a dictionary or a standard array.
+
+        :param patch_bbox_s: np.ndarray - The bounding box coordinates defining the area of the patch to be extracted.
+        :return: The extracted patch and its bounding box, or just the bounding box if the image is a dictionary.
+        """
+
         if self.image_h is not None and not isinstance(self.image_h, dict):
             patch_bbox_h = utils.bbox_s_to_bbox_h(patch_bbox_s, self.image_h, self.spatial_first)
             patch_h = self.image_h[slicer(self.image_h, patch_bbox_h)]
@@ -206,32 +281,24 @@ class _CropGridSampler:
 class _EdgeGridSampler(_CropGridSampler):
     def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
         """
-        TODO Redo doc
+        Initializes the _EdgeGridSampler object, a subclass of _CropGridSampler, for sampling patches using the edge sampling strategy.
 
-        An N-dimensional grid sampler that should mainly be used for inference. The image is divided into a grid with each grid cell having the size of patch_size. The grid can have offset if step_size is specified.
-        If patch_size is not a multiple of image_size then the remainder part of the image is not padded, but instead patches are sampled at the edge of the image of size patch_size like this:
-        ----------------------
-        |                | X |
-        |                | X |
-        |                | X |
-        |                | X |
-        |----------------| X |
-        |X  X  X  X  X  X  X |
-        ----------------------
-        The grid sampler only returns image patches if image is set.
-        Otherwise, only the patch bbox w_start, w_end, h_start, h_end, d_start, d_end are returned. They can be used to extract the patch from the image like this:
-        img = img[w_start:w_end, h_start:h_end, d_start:d_end] (Example for a 3D image)
-        Requiring only size parameters instead of the actual image makes the grid sampler file format independent if desired.
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
-        :param image: The image data in a numpy-style format (Numpy, Zarr, Dask, ...) with or without batch and channel dimensions. Can also be a dict of multiple images.
-        If None then patch bbox (w_start, w_end, h_start, h_end, d_start, d_end, ...) are returned instead.
-        :param spatial_size: The shape of the image without batch and channel dimensions. Always required.
-        :param patch_size: The shape of the patch without batch and channel dimensions. Always required.
-        :param step_size: The shape of the patch offset without batch and channel dimensions. If None then the patch offset is equal to patch_size.
+        :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
+        :param patch_size_s: np.ndarray - The size of the patches to be sampled.
+        :param step_size_s: np.ndarray - The step size between patches.
+        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
+        :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         """
         super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
+        """
+        Computes the positions and sizes of patches for edge sampling. This method, specific to _EdgeGridSampler, adjusts the patch positions so that the 
+        last patch in each dimension aligns with the edge of the image. It extends the functionality of compute_patches in _CropGridSampler to handle the 
+        edge sampling strategy.
+        """
         n_axis_s = len(self.image_size_s)
         stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
         axis_positions_s = [np.arange(0, stop_s[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]
@@ -249,14 +316,30 @@ class _EdgeGridSampler(_CropGridSampler):
 
 class _AdaptiveGridSampler(_CropGridSampler):
     def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, min_patch_size_s: np.ndarray = None):
-        # TODO: When used in ChunkedGridSampler the adaptive patches should have a minimum size of patch size
-        # TODO: Do doc
+        """
+        Initializes the _AdaptiveGridSampler object, a subclass of _CropGridSampler, designed for adaptive patch sampling. This sampler adjusts the last patch 
+        size to fit within the image boundaries, potentially reducing the patch size if necessary.
+
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
+
+        :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
+        :param patch_size_s: np.ndarray - The size of the patches to be sampled.
+        :param step_size_s: np.ndarray - The step size between patches.
+        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
+        :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
+        :param min_patch_size_s: np.ndarray - The minimum size for the last patch in each dimension, ensuring it fits within the image. Defaults to None.
+        """
         self.min_patch_size_s = min_patch_size_s
         if self.min_patch_size_s is not None and np.any(self.min_patch_size_s > patch_size_s):
             raise RuntimeError("The minimum patch size ({}) cannot be greater than the actual patch size ({}) in one or more dimensions.".format(self.min_patch_size_s, patch_size_s))
         super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
+        """
+        Computes the positions and sizes of patches for adaptive sampling. This method, specific to _AdaptiveGridSampler, modifies the size of the last patch 
+        in each dimension to ensure it fits within the image boundaries. It may reduce the patch size to a specified minimum, adapting to the image dimensions 
+        while maintaining patch coverage.
+        """
         n_axis_s = len(self.image_size_s)
         stop = [self.image_size_s[axis] for axis in range(n_axis_s)]
         axis_positions_s = [np.arange(0, stop[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]
@@ -279,9 +362,26 @@ class _AdaptiveGridSampler(_CropGridSampler):
 
 class _SqueezeGridSampler(_CropGridSampler):
     def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+        """
+        Initializes the _SqueezeGridSampler object, a subclass of _CropGridSampler, designed for squeeze sampling strategy. This sampler adjusts the positions 
+        of all patches to ensure that they fit within the image dimensions, slightly increasing overlap between patches if necessary.
+
+        A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
+
+        :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
+        :param patch_size_s: np.ndarray - The size of the patches to be sampled.
+        :param step_size_s: np.ndarray - The step size between patches.
+        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
+        :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
+        """
         super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)
 
     def compute_patches(self):
+        """
+        Computes the positions and sizes of patches for squeeze sampling. This method, specific to _SqueezeGridSampler, adjusts the position of each patch 
+        to ensure that all patches fit within the image dimensions. It adjusts the patch positions of all patches to ensure that they fit within the image dimensions, 
+        slightly increasing overlap between patches if necessary.
+        """
         n_axis_s = len(self.image_size_s)
         stop_s = [self.image_size_s[axis] - self.patch_size_s[axis] + 1 for axis in range(n_axis_s)]
         axis_positions_s = [np.arange(0, stop_s[axis], self.step_size_s[axis]) for axis in range(n_axis_s)]

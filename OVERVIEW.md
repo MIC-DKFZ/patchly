@@ -15,7 +15,7 @@ Patchly provides the following advanced features:
 - Memory-mapped image support
 - Patch overlap
 - ~~Numpy padding techniques~~
-- Support for images with non-spatial dimensions (color dimension, batch dimension, ...)
+- Support for images with non-spatial dimensions (channel dimension, batch dimension, ...)
 - Chunk aggregation to minimize memory consumption
 
 ## Sampler

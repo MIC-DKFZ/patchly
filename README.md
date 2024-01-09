@@ -37,7 +37,7 @@ You can install `patchly` via [pip](https://pypi.org/project/patchly/):
 
 Demonstration on how to use Patchly for sliding-window patchification and subsequent aggregation:
 ```python
-sampler = GridSampler(spatial_size, patch_size, step_size, image)
+sampler = GridSampler(image, spatial_size, patch_size, step_size)
 aggregator = Aggregator(sampler, output_size)
 
 for patch, patch_bbox in sampler:

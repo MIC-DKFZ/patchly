@@ -15,17 +15,17 @@ class SamplingMode(Enum):
 
 
 class GridSampler:
-    def __init__(self, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], step_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
-                 image: Optional[npt.ArrayLike] = None, spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_SQUEEZE, pad_kwargs: dict = None):
+    def __init__(self, image: npt.ArrayLike, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], step_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
+                 spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_SQUEEZE, pad_kwargs: dict = None):
         """
         Initializes the GridSampler object with specified parameters for sampling patches from an image.
 
         A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
+        :param image: npt.ArrayLike - The image from which patches will be sampled. Can be None, if only patch bboxes are relevant.
         :param spatial_size: Union[Tuple, npt.ArrayLike] - The size of the spatial dimensions of the image.
         :param patch_size: Union[Tuple, npt.ArrayLike] - The size of the patches to be sampled.
         :param step_size: Optional[Union[Tuple, npt.ArrayLike]] - The step size between patches. Defaults to the same as patch_size if None.
-        :param image: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
         :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         :param mode: SamplingMode - The sampling mode to use, which affects how patch borders are handled. Defaults to SamplingMode.SAMPLE_SQUEEZE.
         :param pad_kwargs: dict - Additional keyword arguments for numpy's pad function, used in certain padding modes. Defaults to None.
@@ -173,16 +173,16 @@ class GridSampler:
 
 
 class _CropGridSampler:
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+    def __init__(self, image_h: npt.ArrayLike, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, spatial_first: bool = True):
         """
         Initializes the _CropGridSampler object, a subclass of GridSampler, for sampling patches using the crop sampling strategy, discarding all patches extending over the image.
 
         A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
+        :param image_h: npt.ArrayLike - The image from which patches will be sampled. Can be None, if only patch bboxes are relevant.
         :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
         :param patch_size_s: np.ndarray - The size of the patches to be sampled.
-        :param step_size_s: np.ndarray - The step size between patches.
-        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
+        :param step_size_s: np.ndarray - The step size between patches.        
         :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         """
         self.image_h = image_h
@@ -279,16 +279,16 @@ class _CropGridSampler:
 
 
 class _EdgeGridSampler(_CropGridSampler):
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+    def __init__(self, image_h: npt.ArrayLike, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, spatial_first: bool = True):
         """
         Initializes the _EdgeGridSampler object, a subclass of _CropGridSampler, for sampling patches using the edge sampling strategy.
 
         A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
+        :param image_h: npt.ArrayLike - The image from which patches will be sampled. Can be None, if only patch bboxes are relevant.
         :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
         :param patch_size_s: np.ndarray - The size of the patches to be sampled.
         :param step_size_s: np.ndarray - The step size between patches.
-        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
         :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         """
         super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)
@@ -315,17 +315,17 @@ class _EdgeGridSampler(_CropGridSampler):
 
 
 class _AdaptiveGridSampler(_CropGridSampler):
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True, min_patch_size_s: np.ndarray = None):
+    def __init__(self, image_h: npt.ArrayLike, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, spatial_first: bool = True, min_patch_size_s: np.ndarray = None):
         """
         Initializes the _AdaptiveGridSampler object, a subclass of _CropGridSampler, designed for adaptive patch sampling. This sampler adjusts the last patch 
         size to fit within the image boundaries, potentially reducing the patch size if necessary.
 
         A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
+        :param image_h: npt.ArrayLike - The image from which patches will be sampled. Can be None, if only patch bboxes are relevant.
         :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
         :param patch_size_s: np.ndarray - The size of the patches to be sampled.
         :param step_size_s: np.ndarray - The step size between patches.
-        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
         :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         :param min_patch_size_s: np.ndarray - The minimum size for the last patch in each dimension, ensuring it fits within the image. Defaults to None.
         """
@@ -361,17 +361,17 @@ class _AdaptiveGridSampler(_CropGridSampler):
 
 
 class _SqueezeGridSampler(_CropGridSampler):
-    def __init__(self, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, image_h: Optional[npt.ArrayLike] = None, spatial_first: bool = True):
+    def __init__(self, image_h: npt.ArrayLike, image_size_s: np.ndarray, patch_size_s: np.ndarray, step_size_s: np.ndarray, spatial_first: bool = True):
         """
         Initializes the _SqueezeGridSampler object, a subclass of _CropGridSampler, designed for squeeze sampling strategy. This sampler adjusts the positions 
         of all patches to ensure that they fit within the image dimensions, slightly increasing overlap between patches if necessary.
 
         A complete overview of how the Sampler and Aggregator work and an in-depth explanation of the features can be found in OVERVIEW.md.
 
+        :param image_h: npt.ArrayLike - The image from which patches will be sampled. Can be None, if only patch bboxes are relevant.
         :param image_size_s: np.ndarray - The size of the spatial dimensions of the image.
         :param patch_size_s: np.ndarray - The size of the patches to be sampled.
         :param step_size_s: np.ndarray - The step size between patches.
-        :param image_h: Optional[npt.ArrayLike] - The image from which patches will be sampled. Can be None.
         :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         """
         super().__init__(image_size_s=image_size_s, patch_size_s=patch_size_s, step_size_s=step_size_s, image_h=image_h, spatial_first=spatial_first)

@@ -23,9 +23,10 @@ Patchly provides the following advanced features:
 - Support for any array-like images (Numpy, Tensor, Zarr, Dask, ...)
 - Memory-mapped image support
 - Patch overlap
-- ~~Numpy padding techniques~~
+- Gaussian patch averaging
 - Support for images with non-spatial dimensions (channel dimension, batch dimension, ...)
 - Chunk aggregation to minimize memory consumption
+- ~~Numpy padding techniques~~
 
 ## Installation
 

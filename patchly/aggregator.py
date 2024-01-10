@@ -398,7 +398,7 @@ class _ChunkAggregator(_Aggregator):
         :return: Tuple[_AdaptiveGridSampler, defaultdict, defaultdict] - Returns a tuple containing the chunk sampler, a dictionary mapping chunk IDs to patch data, and a dictionary mapping patch bounding boxes to chunk IDs.
         """
         patch_sampler = self.sampler
-        chunk_sampler = _AdaptiveGridSampler(image_size_s=self.image_size_s, patch_size_s=self.chunk_size_s, step_size_s=self.chunk_size_s)
+        chunk_sampler = _AdaptiveGridSampler(image_h=None, image_size_s=self.image_size_s, patch_size_s=self.chunk_size_s, step_size_s=self.chunk_size_s)
         chunk_patch_dict = defaultdict(dict)
         patch_chunk_dict = defaultdict(dict)
         

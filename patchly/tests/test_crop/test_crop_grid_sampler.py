@@ -214,7 +214,7 @@ class TestBasicGridSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros(result_size)
-        sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first, mode=SamplingMode.SAMPLE_CROP)
+        sampler = GridSampler(image=None, spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first, mode=SamplingMode.SAMPLE_CROP)
 
         for patch_bbox in sampler:
             result[slicer(result, patch_bbox)] = 1

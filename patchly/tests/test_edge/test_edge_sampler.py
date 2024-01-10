@@ -195,7 +195,7 @@ class TestEdgeSampler(unittest.TestCase):
 
         # Test without image
         result = np.zeros_like(image)
-        sampler = GridSampler(spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first, mode=SamplingMode.SAMPLE_EDGE)
+        sampler = GridSampler(image=None, spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first, mode=SamplingMode.SAMPLE_EDGE)
 
         for patch_bbox in sampler:
             result[slicer(result, patch_bbox)] = 1

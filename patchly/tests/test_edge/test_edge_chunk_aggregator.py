@@ -212,8 +212,8 @@ class TestEdgeChunkAggregator(unittest.TestCase):
             output_size = np.moveaxis(image.shape, softmax_dim, 0)[1:]
         
         # Test with output size
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_EDGE)
-        aggregator = Aggregator(sampler=sampler, output_size=output_size, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, chunk_size=chunk_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_EDGE)
+        aggregator = Aggregator(sampler=sampler, output_size=output_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):
             if multiply_elements_by_two:
@@ -233,8 +233,8 @@ class TestEdgeChunkAggregator(unittest.TestCase):
         # Test without output array
         if output is None:
             output = np.zeros_like(image)
-        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_EDGE)
-        aggregator = Aggregator(sampler=sampler, output=output, chunk_size=chunk_size, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
+        sampler = GridSampler(image=copy.deepcopy(image), spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, chunk_size=chunk_size, spatial_first=spatial_first_sampler, mode=SamplingMode.SAMPLE_EDGE)
+        aggregator = Aggregator(sampler=sampler, output=output, weights=weights, spatial_first=spatial_first_aggregator, softmax_dim=softmax_dim)
 
         for i, (patch, patch_bbox) in enumerate(sampler):
             if multiply_elements_by_two:

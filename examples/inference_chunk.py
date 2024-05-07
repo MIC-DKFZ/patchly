@@ -1,5 +1,5 @@
 import numpy as np
-from patchly import GridSampler, Aggregator
+from patchly import GridSampler, Aggregator, SamplingMode
 from torch.utils.data import DataLoader, Dataset
 import torch
 
@@ -16,7 +16,7 @@ def example():
     chunk_size = (500, 500)
 
     # Init GridSampler
-    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, spatial_first=False)
+    sampler = GridSampler(image=image, spatial_size=spatial_size, patch_size=patch_size, step_size=step_size, chunk_size=chunk_size, spatial_first=False, mode=SamplingMode.SAMPLE_SQUEEZE)
     # Convert sampler into a PyTorch dataset
     loader = SamplerDataset(sampler)
     # Init dataloader
@@ -24,7 +24,7 @@ def example():
     # Create an empty prediction passed to the aggregator
     prediction = np.zeros(spatial_size, dtype=np.uint8)
     # Init aggregator
-    aggregator = Aggregator(sampler=sampler, output=prediction, chunk_size=chunk_size, weights='gaussian', softmax_dim=0, spatial_first=False, has_batch_dim=True)
+    aggregator = Aggregator(sampler=sampler, output=prediction, weights='gaussian', softmax_dim=0, spatial_first=False, has_batch_dim=True)
 
     # Run inference
     with torch.no_grad():

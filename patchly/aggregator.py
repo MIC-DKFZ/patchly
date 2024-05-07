@@ -24,7 +24,7 @@ class PatchStatus(Enum):
 
 
 class Aggregator:
-    def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
+    def __init__(self, sampler: GridSampler, output_size: Optional[Union[Tuple, npt.ArrayLike]] = None, output: Optional[npt.ArrayLike] = None, 
                  weights: Union[str, Callable] = 'avg', softmax_dim: Optional[int] = None, has_batch_dim: bool = False, spatial_first: bool = True, device: str = 'cpu'):
         """
         Initializes the Aggregator object for aggregating patches into a larger output image.
@@ -45,7 +45,7 @@ class Aggregator:
         self.image_size_s = sampler.image_size_s
         self.patch_size_s = sampler.patch_size_s
         self.step_size_s = sampler.step_size_s
-        self.chunk_size_s = chunk_size
+        self.chunk_size_s = sampler.chunk_size_s
         self.spatial_first = spatial_first
         self.mode = sampler.mode
         self.softmax_dim = softmax_dim
@@ -138,12 +138,6 @@ class Aggregator:
             raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[:len(self.image_size_s)], self.image_size_s))
         if (not self.spatial_first) and (self.output_h.shape[-len(self.image_size_s):] != tuple(self.image_size_s)):
             raise RuntimeError("The spatial size of the given output {} is unequal to the given spatial size {}.".format(self.output_h.shape[-len(self.image_size_s):], self.image_size_s))
-        if self.chunk_size_s is not None and np.any(self.chunk_size_s > self.image_size_s):
-            raise RuntimeError("The chunk size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.chunk_size_s, self.image_size_s))
-        if self.chunk_size_s is not None and np.any(self.patch_size_s >= self.chunk_size_s):
-            raise RuntimeError("The patch size ({}) cannot be greater or equal to the chunk size ({}) in one or more dimensions.".format(self.patch_size_s, self.chunk_size_s))
-        if self.chunk_size_s is not None and len(self.image_size_s) != len(self.chunk_size_s):
-            raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({}).".format(self.chunk_size_s, self.image_size_s))
         if self.has_batch_dim and self.spatial_first:
             raise RuntimeError("The arguments has_batch_dim and spatial_first cannot both be true at the same time.")
         if self.mode.name.startswith('PAD_') and self.chunk_size_s is not None:
@@ -377,7 +371,7 @@ class _ChunkAggregator(_Aggregator):
         self.step_size_s = step_size_s
         self.chunk_size_s = chunk_size_s
         self.chunk_dtype = self.set_chunk_dtype()
-        self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict = self.compute_patches()
+        self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict = self.sampler.chunk_sampler, self.sampler.chunk_patch_dict, self.sampler.patch_chunk_dict
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def set_chunk_dtype(self) -> np.dtype:
@@ -390,34 +384,6 @@ class _ChunkAggregator(_Aggregator):
             return self.output_h.dtype
         else:
             return np.float32
-
-    def compute_patches(self) -> Tuple[_AdaptiveGridSampler, defaultdict, defaultdict]:
-        """
-        Computes and organizes the patches and chunks needed for chunk-based aggregation in the _ChunkAggregator class.
-
-        :return: Tuple[_AdaptiveGridSampler, defaultdict, defaultdict] - Returns a tuple containing the chunk sampler, a dictionary mapping chunk IDs to patch data, and a dictionary mapping patch bounding boxes to chunk IDs.
-        """
-        patch_sampler = self.sampler
-        chunk_sampler = _AdaptiveGridSampler(image_h=None, image_size_s=self.image_size_s, patch_size_s=self.chunk_size_s, step_size_s=self.chunk_size_s)
-        chunk_patch_dict = defaultdict(dict)
-        patch_chunk_dict = defaultdict(dict)
-        
-        for idx in range(len(patch_sampler)):
-            patch_bbox_s = patch_sampler._get_bbox(idx)
-            patch_h = utils.LazyArray()
-            patch_chunk_dict[str(patch_bbox_s)]["patch"] = patch_h
-            patch_chunk_dict[str(patch_bbox_s)]["chunks"] = []
-            for chunk_id, chunk_bbox_s in enumerate(chunk_sampler):
-                if utils.is_overlapping(chunk_bbox_s, patch_bbox_s):
-                    # Shift to chunk coordinate system
-                    valid_patch_bbox_s = patch_bbox_s - np.array([chunk_bbox_s[:, 0], chunk_bbox_s[:, 0]]).T
-                    # Crop patch bbox to chunk bounds
-                    valid_patch_bbox_s = np.array([[max(valid_patch_bbox_s[i][0], 0), min(valid_patch_bbox_s[i][1], chunk_bbox_s[i][1] - chunk_bbox_s[i][0])] for i in range(len(chunk_bbox_s))])
-                    crop_patch_bbox_s = valid_patch_bbox_s + np.array([chunk_bbox_s[:, 0], chunk_bbox_s[:, 0]]).T - np.array([patch_bbox_s[:, 0], patch_bbox_s[:, 0]]).T
-                    chunk_patch_dict[chunk_id][str(patch_bbox_s)] = {"valid_patch_bbox": valid_patch_bbox_s, "crop_patch_bbox": crop_patch_bbox_s, "patch": patch_h, "status": PatchStatus.EMPTY}
-                    patch_chunk_dict[str(patch_bbox_s)]["chunks"].append(chunk_id)
-
-        return chunk_sampler, chunk_patch_dict, patch_chunk_dict
 
     def append(self, patch_h: npt.ArrayLike, patch_bbox_s: Union[Tuple, npt.ArrayLike]) -> None:
         """

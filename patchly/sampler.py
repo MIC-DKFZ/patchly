@@ -4,6 +4,7 @@ from patchly import utils
 from typing import Union, Optional, Tuple
 import numpy.typing as npt
 from enum import Enum
+from collections import defaultdict
 
 
 class SamplingMode(Enum):
@@ -14,9 +15,15 @@ class SamplingMode(Enum):
     PAD_UNKNOWN = 5
 
 
+class PatchStatus(Enum):
+    EMPTY = 1
+    FILLED = 2
+    COMPLETED = 3
+
+
 class GridSampler:
     def __init__(self, image: npt.ArrayLike, spatial_size: Union[Tuple, npt.ArrayLike], patch_size: Union[Tuple, npt.ArrayLike], step_size: Optional[Union[Tuple, npt.ArrayLike]] = None, 
-                 spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_SQUEEZE, pad_kwargs: dict = None):
+                 chunk_size: Optional[Union[Tuple, npt.ArrayLike]] = None, spatial_first: bool = True, mode: SamplingMode = SamplingMode.SAMPLE_SQUEEZE, pad_kwargs: dict = None):
         """
         Initializes the GridSampler object with specified parameters for sampling patches from an image.
 
@@ -26,6 +33,7 @@ class GridSampler:
         :param spatial_size: Union[Tuple, npt.ArrayLike] - The size of the spatial dimensions of the image.
         :param patch_size: Union[Tuple, npt.ArrayLike] - The size of the patches to be sampled.
         :param step_size: Optional[Union[Tuple, npt.ArrayLike]] - The step size between patches. Defaults to the same as patch_size if None.
+        :param chunk_size: Optional[Union[Tuple, npt.ArrayLike]] - The size of chunks for chunk-based processing. Optional.
         :param spatial_first: bool - Indicates whether spatial dimensions come first in the image array. Defaults to True.
         :param mode: SamplingMode - The sampling mode to use, which affects how patch borders are handled. Defaults to SamplingMode.SAMPLE_SQUEEZE.
         :param pad_kwargs: dict - Additional keyword arguments for numpy's pad function, used in certain padding modes. Defaults to None.
@@ -34,12 +42,15 @@ class GridSampler:
         self.image_size_s = np.asarray(spatial_size)
         self.patch_size_s = np.asarray(patch_size)
         self.step_size_s = self.set_step_size(step_size, patch_size)
+        self.chunk_size_s = chunk_size
         self.spatial_first = spatial_first
         self.mode = mode
         self.pad_kwargs = pad_kwargs
         self.pad_width = None
         self.check_sanity()
         self.sampler = self.create_sampler()
+        self.chunk_sampler, self.chunk_patch_dict, self.patch_chunk_dict, self.patch_str_dict = self.set_chunks(chunk_size)
+        self.align_patches_with_chunks()
 
     def set_step_size(self, step_size_s: Union[Tuple, np.ndarray], patch_size_s: Union[Tuple, np.ndarray]) -> np.ndarray:
         """
@@ -54,6 +65,12 @@ class GridSampler:
         else:
             step_size_s = np.asarray(step_size_s)
         return step_size_s
+    
+    def set_chunks(self, chunk_size):
+        if chunk_size is None:
+            return None, None, None, None
+        else:
+            return self.compute_chunks()
 
     def check_sanity(self):
         """
@@ -76,6 +93,12 @@ class GridSampler:
         if self.step_size_s is not None and len(self.image_size_s) != len(self.step_size_s):
             raise RuntimeError("The dimensionality of the patch offset ({}) is required to be the same as the spatial size ({})."
                                .format(self.step_size_s, self.image_size_s))
+        if self.chunk_size_s is not None and np.any(self.chunk_size_s > self.image_size_s):
+            raise RuntimeError("The chunk size ({}) cannot be greater than the spatial size ({}) in one or more dimensions.".format(self.chunk_size_s, self.image_size_s))
+        if self.chunk_size_s is not None and np.any(self.patch_size_s >= self.chunk_size_s):
+            raise RuntimeError("The patch size ({}) cannot be greater or equal to the chunk size ({}) in one or more dimensions.".format(self.patch_size_s, self.chunk_size_s))
+        if self.chunk_size_s is not None and len(self.image_size_s) != len(self.chunk_size_s):
+            raise RuntimeError("The dimensionality of the chunk size ({}) is required to be the same as the spatial size ({}).".format(self.chunk_size_s, self.image_size_s))
         if self.mode.name.startswith('PAD_') and (self.image_h is None or not isinstance(self.image_h, np.ndarray)):
             raise RuntimeError("The given sampling mode ({}) requires the image to be given and as type np.ndarray.".format(self.mode))
         
@@ -162,14 +185,57 @@ class GridSampler:
         """
         return self.sampler.__next__()
     
-    def _get_bbox(self, idx: int) -> np.ndarray:
+    def get_bbox(self, idx: int) -> np.ndarray:
         """
         Retrieves the bounding box coordinates of the patch at the specified index. This internal method is used to determine the spatial location of a patch within the larger image.
 
         :param idx: int - The index of the patch for which the bounding box is required.
         :return: np.ndarray - The bounding box coordinates of the specified patch.
         """
-        return self.sampler._get_bbox(idx)
+        return self.sampler.get_bbox(idx)
+    
+    def compute_chunks(self):
+        """
+        Computes and organizes the patches and chunks needed for chunk-based aggregation in the _ChunkAggregator class.
+
+        :return: Tuple[_AdaptiveGridSampler, defaultdict, defaultdict] - Returns a tuple containing the chunk sampler, a dictionary mapping chunk IDs to patch data, and a dictionary mapping patch bounding boxes to chunk IDs.
+        """
+        patch_sampler = self.sampler
+        chunk_sampler = _AdaptiveGridSampler(image_h=None, image_size_s=self.image_size_s, patch_size_s=self.chunk_size_s, step_size_s=self.chunk_size_s)
+        chunk_patch_dict = defaultdict(dict)
+        patch_chunk_dict = defaultdict(dict)
+        patch_str_dict = defaultdict(dict)
+        
+        for idx in range(len(patch_sampler)):
+            patch_bbox_s = patch_sampler.get_bbox(idx)
+            patch_str_dict[str(patch_bbox_s)] = patch_bbox_s
+            patch_h = utils.LazyArray()
+            patch_chunk_dict[str(patch_bbox_s)]["patch"] = patch_h
+            patch_chunk_dict[str(patch_bbox_s)]["chunks"] = []
+            for chunk_id, chunk_bbox_s in enumerate(chunk_sampler):
+                if utils.is_overlapping(chunk_bbox_s, patch_bbox_s):
+                    # Shift to chunk coordinate system
+                    valid_patch_bbox_s = patch_bbox_s - np.array([chunk_bbox_s[:, 0], chunk_bbox_s[:, 0]]).T
+                    # Crop patch bbox to chunk bounds
+                    valid_patch_bbox_s = np.array([[max(valid_patch_bbox_s[i][0], 0), min(valid_patch_bbox_s[i][1], chunk_bbox_s[i][1] - chunk_bbox_s[i][0])] for i in range(len(chunk_bbox_s))])
+                    crop_patch_bbox_s = valid_patch_bbox_s + np.array([chunk_bbox_s[:, 0], chunk_bbox_s[:, 0]]).T - np.array([patch_bbox_s[:, 0], patch_bbox_s[:, 0]]).T
+                    chunk_patch_dict[chunk_id][str(patch_bbox_s)] = {"valid_patch_bbox": valid_patch_bbox_s, "crop_patch_bbox": crop_patch_bbox_s, "patch": patch_h, "status": PatchStatus.EMPTY}
+                    patch_chunk_dict[str(patch_bbox_s)]["chunks"].append(chunk_id)
+
+        return chunk_sampler, chunk_patch_dict, patch_chunk_dict, patch_str_dict
+    
+    def align_patches_with_chunks(self):
+        if self.chunk_size_s is not None:
+            patch_chunk_tuples = [(patch, np.min(chunks["chunks"])) for patch, chunks in self.patch_chunk_dict.items()]
+            # patch_chunk_tuples = sorted(patch_chunk_tuples, key=lambda item: (item[1], item[0]))
+            patch_chunk_tuples = sorted(patch_chunk_tuples, key=lambda item: item[1])
+            patch_index_mapping = {str(self.sampler.get_bbox(idx)): idx for idx in range(len(self.sampler))}
+            aligned_patch_positions_s = [self.patch_str_dict[patch] for patch, _ in patch_chunk_tuples]            
+            aligned_patch_indices = [patch_index_mapping[str(pos)] for pos in aligned_patch_positions_s]
+            aligned_patch_positions_s = self.sampler.patch_positions_s[aligned_patch_indices]
+            aligned_patch_sizes_s = self.sampler.patch_sizes_s[aligned_patch_indices]
+            self.sampler.patch_positions_s = aligned_patch_positions_s
+            self.sampler.patch_sizes_s = aligned_patch_sizes_s
 
 
 class _CropGridSampler:
@@ -230,7 +296,7 @@ class _CropGridSampler:
         :param idx: int - The index of the patch to retrieve.
         :return: The patch and patch location at the specified index.
         """
-        patch_bbox_s = self._get_bbox(idx)
+        patch_bbox_s = self.get_bbox(idx)
         patch_result = self.get_patch_result(patch_bbox_s)
         return patch_result
 
@@ -246,7 +312,7 @@ class _CropGridSampler:
         else:
             raise StopIteration
         
-    def _get_bbox(self, idx: int) -> np.ndarray:
+    def get_bbox(self, idx: int) -> np.ndarray:
         """
         Computes the bounding box for the patch at the specified index. This internal method calculates the spatial coordinates defining the area of the image 
         covered by the patch, facilitating the extraction of the specific patch.

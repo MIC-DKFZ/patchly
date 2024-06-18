@@ -181,16 +181,20 @@ class TensorArray(ArrayLike):
         }
 
     def create_zeros(self, shape, dtype=None):
-        if isinstance(dtype, str) or isinstance(dtype, np.dtype):
-            dtype = str(dtype)
+        if isinstance(dtype, str):
             dtype = self.dtype_map[dtype]
+        elif issubclass(np.dtype(dtype).type, np.generic):
+            dtype = np.dtype(dtype)
+            dtype = self.dtype_map[str(dtype)]
         self.data = torch.zeros(tuple(shape), dtype=dtype, device=self.device)
         return self
 
     def create_ones(self, shape, dtype=None):
-        if isinstance(dtype, str) or isinstance(dtype, np.dtype):
-            dtype = str(dtype)
+        if isinstance(dtype, str):
             dtype = self.dtype_map[dtype]
+        elif issubclass(np.dtype(dtype).type, np.generic):
+            dtype = np.dtype(dtype)
+            dtype = self.dtype_map[str(dtype)]
         self.data = torch.ones(tuple(shape), dtype=dtype, device=self.device)
         return self
     

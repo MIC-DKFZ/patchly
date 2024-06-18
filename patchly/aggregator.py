@@ -462,7 +462,7 @@ class _ChunkAggregator(_Aggregator):
             valid_patch_bbox_s = patch_data["valid_patch_bbox"]
             crop_patch_bbox_s = patch_data["crop_patch_bbox"]
             patch_h = patch_data["patch"].data
-            patch_data["patch"] = None
+            patch_data["patch"].clear_data()
             patch_data["status"] = PatchStatus.COMPLETED
             crop_patch_bbox_h = utils.bbox_s_to_bbox_h(crop_patch_bbox_s, chunk_h, self.spatial_first)
             valid_patch_bbox_h = utils.bbox_s_to_bbox_h(valid_patch_bbox_s, chunk_h, self.spatial_first)

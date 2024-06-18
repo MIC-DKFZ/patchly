@@ -14,6 +14,8 @@ class LazyArray:
     def create(self, data):
         self._data = data
 
+    def clear_data(self):
+        self._data = None
     @property
     def data(self):
         if self._data is None:

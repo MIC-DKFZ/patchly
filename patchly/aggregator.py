@@ -458,12 +458,15 @@ class _ChunkAggregator(_Aggregator):
         chunk_h = create_array_like(self.array_type, None, self.device).create_zeros(chunk_size_h, self.chunk_dtype)
         if self.softmax_dim is None:
             weight_map_h = create_array_like(self.array_type, None, self.device).create_zeros(chunk_size_h)
-        for patch_data in self.chunk_patch_dict[chunk_id].values():
+        for patch_bbox_s_str, patch_data in self.chunk_patch_dict[chunk_id].items():
             valid_patch_bbox_s = patch_data["valid_patch_bbox"]
             crop_patch_bbox_s = patch_data["crop_patch_bbox"]
             patch_h = patch_data["patch"].data
-            patch_data["patch"].clear_data()
-            patch_data["status"] = PatchStatus.COMPLETED
+            self.patch_chunk_dict[patch_bbox_s_str]['unprocessed_chunks'].remove(chunk_id)
+            if not self.patch_chunk_dict[patch_bbox_s_str]['unprocessed_chunks']:
+                patch_data["patch"].clear()
+                patch_data["patch"] = None
+                patch_data["status"] = PatchStatus.COMPLETED
             crop_patch_bbox_h = utils.bbox_s_to_bbox_h(crop_patch_bbox_s, chunk_h, self.spatial_first)
             valid_patch_bbox_h = utils.bbox_s_to_bbox_h(valid_patch_bbox_s, chunk_h, self.spatial_first)
             valid_patch_h = patch_h[slicer(patch_h, crop_patch_bbox_h)]

@@ -212,6 +212,7 @@ class GridSampler:
             patch_h = utils.LazyArray()
             patch_chunk_dict[str(patch_bbox_s)]["patch"] = patch_h
             patch_chunk_dict[str(patch_bbox_s)]["chunks"] = []
+            patch_chunk_dict[str(patch_bbox_s)]["unprocessed_chunks"] = []
             for chunk_id, chunk_bbox_s in enumerate(chunk_sampler):
                 if utils.is_overlapping(chunk_bbox_s, patch_bbox_s):
                     # Shift to chunk coordinate system
@@ -221,6 +222,7 @@ class GridSampler:
                     crop_patch_bbox_s = valid_patch_bbox_s + np.array([chunk_bbox_s[:, 0], chunk_bbox_s[:, 0]]).T - np.array([patch_bbox_s[:, 0], patch_bbox_s[:, 0]]).T
                     chunk_patch_dict[chunk_id][str(patch_bbox_s)] = {"valid_patch_bbox": valid_patch_bbox_s, "crop_patch_bbox": crop_patch_bbox_s, "patch": patch_h, "status": PatchStatus.EMPTY}
                     patch_chunk_dict[str(patch_bbox_s)]["chunks"].append(chunk_id)
+                    patch_chunk_dict[str(patch_bbox_s)]["unprocessed_chunks"].append(chunk_id)
 
         return chunk_sampler, chunk_patch_dict, patch_chunk_dict, patch_str_dict
     

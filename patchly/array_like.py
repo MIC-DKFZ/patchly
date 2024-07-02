@@ -227,4 +227,4 @@ class TensorArray(ArrayLike):
         return TensorArray(torch.argmax(self.data, axis), self.device)
  
     def to(self, device):
-        return TensorArray(self.data, self.device)
+        return TensorArray(self.data, device)

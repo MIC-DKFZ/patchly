@@ -229,6 +229,8 @@ class TensorArray(ArrayLike):
             return dtype
         if isinstance(dtype, str):
             dtype = np.dtype(dtype).type
+        if isinstance(dtype, np.dtype):
+            dtype = str(dtype)
 
         torch_dtype = self.dtype_map.get(dtype)
 

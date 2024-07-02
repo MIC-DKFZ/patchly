@@ -12,36 +12,6 @@ try:
 except:
     zarr = None
 
-dtype_mapping = {
-    np.float16: torch.float16,
-    np.float32: torch.float32,
-    np.float64: torch.float64,
-    "float16": torch.float16,
-    "float32": torch.float32,
-    "float64": torch.float64,
-    np.uint8: torch.uint8,
-    np.uint16: torch.uint8,
-    "int8": torch.int8,
-    "int16": torch.int16,
-    np.int32: torch.int32,
-    np.int64: torch.int64,
-    "int32": torch.int32,
-    "int64": torch.int64,
-}
-
-
-def to_torch_dtype(dtype):
-    if dtype is None or isinstance(dtype, torch.dtype):
-        return dtype
-    if isinstance(dtype, str):
-        dtype = np.dtype(dtype).type
-
-    torch_dtype = dtype_mapping.get(dtype)
-
-    if torch_dtype is None:
-        raise ValueError(f"Unsupported dtype: {dtype}")
-
-    return torch_dtype
 
 def create_array_like(array_type, data, device=None):
     if array_type == np.ndarray or array_type is None:
@@ -199,20 +169,34 @@ class TensorArray(ArrayLike):
 
         if self.data is not None and not isinstance(self.data, torch.Tensor):
             raise RuntimeError("Given data is not of type torch.Tensor but of type {}".format(type(self.data)))
+        
+        self.dtype_map = {
+            np.float16: torch.float16,
+            "float16": torch.float16,
+            np.float32: torch.float32,
+            "float32": torch.float32,
+            np.float64: torch.float64, 
+            "float64": torch.float64,
+            np.uint8: torch.uint8,
+            "int8": torch.int8,
+            np.uint16: torch.uint8,            
+            "int16": torch.int16,
+            np.int32: torch.int32,
+            "int32": torch.int32,
+            np.int64: torch.int64,            
+            "int64": torch.int64,
+        }
 
     def create_zeros(self, shape, dtype=None):
-        dtype=to_torch_dtype(dtype)
-        self.data = torch.zeros(tuple(shape), dtype=dtype, device=self.device)
+        self.data = torch.zeros(tuple(shape), dtype=self._to_torch_dtype(dtype), device=self.device)
         return self
 
     def create_ones(self, shape, dtype=None):
-        dtype=to_torch_dtype(dtype)
-        self.data = torch.ones(tuple(shape), dtype=dtype, device=self.device)
+        self.data = torch.ones(tuple(shape), dtype=self._to_torch_dtype(dtype), device=self.device)
         return self
     
     def create_gaussian_kernel(self, shape, sigma=1./8, dtype=None):
-        dtype=to_torch_dtype(dtype)
-        self.data = gaussian_kernel_pytorch(shape, sigma, self.device, dtype)
+        self.data = gaussian_kernel_pytorch(shape, sigma, self.device, self._to_torch_dtype(dtype))
         return self
     
     def min(self, axis=None):
@@ -229,8 +213,7 @@ class TensorArray(ArrayLike):
         return self.data.dtype
  
     def astype(self, dtype):
-        dtype=to_torch_dtype(dtype)
-        return TensorArray(self.data.to(dtype=dtype), self.device)
+        return TensorArray(self.data.to(dtype=self._to_torch_dtype(dtype)), self.device)
    
     def nan_to_num(self):
         return TensorArray(torch.nan_to_num(self.data), self.device)
@@ -240,3 +223,16 @@ class TensorArray(ArrayLike):
  
     def to(self, device):
         return TensorArray(self.data, device)
+    
+    def _to_torch_dtype(self, dtype):
+        if dtype is None or isinstance(dtype, torch.dtype):
+            return dtype
+        if isinstance(dtype, str):
+            dtype = np.dtype(dtype).type
+
+        torch_dtype = self.dtype_map.get(dtype)
+
+        if torch_dtype is None:
+            raise ValueError(f"Unsupported dtype: {dtype}")
+
+        return torch_dtype

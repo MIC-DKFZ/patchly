@@ -13,8 +13,10 @@ import warnings
 
 try:
     import zarr
+    TYPE_ZARR_ARRAY = zarr.core.Array if hasattr(zarr.core, "Array") else zarr.core.array.Array
 except:
     zarr = None
+    TYPE_ZARR_ARRAY = None
 
 
 class PatchStatus(Enum):
@@ -427,7 +429,7 @@ class _ChunkAggregator(_Aggregator):
             for chunk_id in self.patch_chunk_dict[str(np.asarray(patch_bbox_s))]["chunks"]:
                 self.chunk_patch_dict[chunk_id][str(np.asarray(patch_bbox_s))]["status"] = PatchStatus.FILLED
                 if self.is_chunk_complete(chunk_id):
-                    if zarr is not None and isinstance(self.output_h.data, zarr.core.Array):
+                    if zarr is not None and isinstance(self.output_h.data, TYPE_ZARR_ARRAY):
                         warnings.warn("Ouput is a Zarr array. Switching to single threading for chunk processing. See issue #39 for more information.") # If issue is solved remove zarr and warnings import statements
                         self.process_chunk(chunk_id)
                     else:

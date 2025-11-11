@@ -9,14 +9,16 @@ except:
 
 try:
     import zarr
+    TYPE_ZARR_ARRAY = zarr.core.Array if hasattr(zarr.core, "Array") else zarr.core.array.Array
 except:
     zarr = None
+    TYPE_ZARR_ARRAY = None
 
 
 def create_array_like(array_type, data, device=None):
     if array_type == np.ndarray or array_type is None:
         return NumpyArray(data, device)
-    elif zarr is not None and array_type == zarr.core.Array:
+    elif zarr is not None and array_type == TYPE_ZARR_ARRAY:
         return NumpyArray(data, device)
     elif torch is not None and array_type == torch.Tensor:
         if data is not None:
